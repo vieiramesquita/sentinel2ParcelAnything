@@ -1,0 +1,177 @@
+[
+  {
+    "id": "GO-5203500-366A293867A24EF5A446DA91E23F8548",
+    "title": "Fazenda Bom Jesus (Pecuária Intensiva)",
+    "subtitle": "Bom Jesus de Goiás - GO",
+    "municipio": "Bom Jesus de Goias",
+    "car_area_ha": 4476.312,
+    "paddocks_count": 178,
+    "center": [
+      -18.335662859571478,
+      -49.99630327605509
+    ],
+    "bounds": [
+      [
+        -18.38730230322334,
+        -50.03697541788949
+      ],
+      [
+        -18.28402341591962,
+        -49.95563113422068
+      ]
+    ],
+    "overlay_url": "data/GO-5203500-366A293867A24EF5A446DA91E23F8548/overlay.png",
+    "overlay_bounds": [
+      [
+        -18.38730230322334,
+        -50.03697541788949
+      ],
+      [
+        -18.28402341591962,
+        -49.95563113422068
+      ]
+    ],
+    "car_url": "data/GO-5203500-366A293867A24EF5A446DA91E23F8548/car.json",
+    "paddocks_url": "data/GO-5203500-366A293867A24EF5A446DA91E23F8548/paddocks.json"
+  },
+  {
+    "id": "GO-5203807-146172AFEDAF44FC82CEEC3A2B92D5F1",
+    "title": "Fazenda Vale do Araguaia",
+    "subtitle": "Britânia - GO",
+    "municipio": "Britania",
+    "car_area_ha": 2629.7952,
+    "paddocks_count": 79,
+    "center": [
+      -15.458632658401712,
+      -51.18268998520253
+    ],
+    "bounds": [
+      [
+        -15.48705096811519,
+        -51.23121473516691
+      ],
+      [
+        -15.430214348688231,
+        -51.13416523523814
+      ]
+    ],
+    "overlay_url": "data/GO-5203807-146172AFEDAF44FC82CEEC3A2B92D5F1/overlay.png",
+    "overlay_bounds": [
+      [
+        -15.48705096811519,
+        -51.23121473516691
+      ],
+      [
+        -15.430214348688231,
+        -51.13416523523814
+      ]
+    ],
+    "car_url": "data/GO-5203807-146172AFEDAF44FC82CEEC3A2B92D5F1/car.json",
+    "paddocks_url": "data/GO-5203807-146172AFEDAF44FC82CEEC3A2B92D5F1/paddocks.json"
+  },
+  {
+    "id": "GO-5204409-01D1AD1F9586415E9D46BF93115D27DF",
+    "title": "Fazenda Caiapó (Relevo Ondulado)",
+    "subtitle": "Caiapônia - GO",
+    "municipio": "Caiaponia",
+    "car_area_ha": 798.225,
+    "paddocks_count": 54,
+    "center": [
+      -16.890560341126687,
+      -51.782207738333085
+    ],
+    "bounds": [
+      [
+        -16.91068499055682,
+        -51.80154983068872
+      ],
+      [
+        -16.870435691696557,
+        -51.76286564597744
+      ]
+    ],
+    "overlay_url": "data/GO-5204409-01D1AD1F9586415E9D46BF93115D27DF/overlay.png",
+    "overlay_bounds": [
+      [
+        -16.91068499055682,
+        -51.80154983068872
+      ],
+      [
+        -16.870435691696557,
+        -51.76286564597744
+      ]
+    ],
+    "car_url": "data/GO-5204409-01D1AD1F9586415E9D46BF93115D27DF/car.json",
+    "paddocks_url": "data/GO-5204409-01D1AD1F9586415E9D46BF93115D27DF/paddocks.json"
+  },
+  {
+    "id": "GO-5208905-F496428818874B9CBBA57AD8132348B1",
+    "title": "Fazenda Rio Vermelho (Mega Imóvel)",
+    "subtitle": "Goiás - GO (10.828 ha)",
+    "municipio": "Goias",
+    "car_area_ha": 10828.8002,
+    "paddocks_count": 354,
+    "center": [
+      -15.833160624787794,
+      -50.4251470450061
+    ],
+    "bounds": [
+      [
+        -15.895893987049483,
+        -50.500680690377465
+      ],
+      [
+        -15.770427262526107,
+        -50.349613399634734
+      ]
+    ],
+    "overlay_url": "data/GO-5208905-F496428818874B9CBBA57AD8132348B1/overlay.png",
+    "overlay_bounds": [
+      [
+        -15.895893987049483,
+        -50.500680690377465
+      ],
+      [
+        -15.770427262526107,
+        -50.349613399634734
+      ]
+    ],
+    "car_url": "data/GO-5208905-F496428818874B9CBBA57AD8132348B1/car.json",
+    "paddocks_url": "data/GO-5208905-F496428818874B9CBBA57AD8132348B1/paddocks.json"
+  },
+  {
+    "id": "GO-5211008-46C08C6235D74D36BE07B5384A17B156",
+    "title": "Fazenda Itapirapuã (Pasto Irrigado)",
+    "subtitle": "Itapirapuã - GO",
+    "municipio": "Itapirapuã - GO",
+    "car_area_ha": 0.0,
+    "paddocks_count": 14,
+    "center": [
+      -15.747254426891818,
+      -50.89382124802137
+    ],
+    "bounds": [
+      [
+        -15.760726046619993,
+        -50.906156033489054
+      ],
+      [
+        -15.733782807163642,
+        -50.88148646255369
+      ]
+    ],
+    "overlay_url": "data/GO-5211008-46C08C6235D74D36BE07B5384A17B156/overlay.png",
+    "overlay_bounds": [
+      [
+        -15.760726046619993,
+        -50.906156033489054
+      ],
+      [
+        -15.733782807163642,
+        -50.88148646255369
+      ]
+    ],
+    "car_url": "data/GO-5211008-46C08C6235D74D36BE07B5384A17B156/car.json",
+    "paddocks_url": "data/GO-5211008-46C08C6235D74D36BE07B5384A17B156/paddocks.json"
+  }
+]
