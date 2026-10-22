@@ -1,7 +1,7 @@
-# 🖱️ Abordagem 1: Segmentação Interativa por Amostragem Visual (Human-in-the-Loop)
+# 🖱️ ParcelAnything: Interactive Mode (Segmentação Interativa Human-in-the-Loop)
 **LAPIG - Laboratório de Processamento de Imagens e Geoprocessamento (UFG)**
 
-Esta abordagem é projetada para **operações assistidas por inteligência visual**, onde um operador humano define ou refina limites de piquetes e divisórias de pastagem através de cliques no mapa interativo.
+O **ParcelAnything Interactive** é projetado para **operações assistidas por inteligência visual**, onde um operador humano define ou refina limites de piquetes e divisórias de pastagem através de cliques no mapa interativo.
 
 ---
 

@@ -1,4 +1,4 @@
-# 🛰️ Segmentação e Vetorização Cadastral de Piquetes de Pastagem (LAPIG)
+# ⚙️ ParcelAnything: Auto Mode (Vetorização Cadastral Automatizada em Lote)
 
 **Laboratório de Processamento de Imagens e Geoprocessamento (LAPIG / UFG)**  
 *Pipeline modular para extração automatizada de piquetes rurais com cercas retilíneas (mourão a mourão), segmentação cadastral pura, classificação temática de pastagem via MapBiomas (até 2025), recorte pelo CAR e benchmark automático de hardware.*

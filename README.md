@@ -1,4 +1,4 @@
-# 🛰️ sentinel2parcel: Segmentação & Vetorização Cadastral de Piquetes de Pastagem (LAPIG)
+# 🛰️ ParcelAnything: Segmentação & Vetorização Cadastral de Piquetes de Pastagem (LAPIG)
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](https://python.org)
 [![PyTorch CUDA](https://img.shields.io/badge/PyTorch-CUDA%20Accelerated-EE4C2C.svg?logo=pytorch&logoColor=white)](https://pytorch.org)
@@ -9,22 +9,22 @@
 [![Benchmark Auditado](https://img.shields.io/badge/Benchmark-21%20Im%C3%B3veis%20%7C%2049.8k%20ha-blue.svg)](#-2-desempenho--recursos-computacionais)
 
 **Laboratório de Processamento de Imagens e Geoprocessamento (LAPIG / UFG)**  
-*O **sentinel2parcel** é um pipeline modular de alto desempenho para extração automatizada de piquetes e divisórias de pastagem com cercas retilíneas (mourão a mourão), topologia planar estanque (Zero Overlaps), validação zonal pelo MapBiomas (10m / 30m) e telemetria contínua de hardware.*
+*O **ParcelAnything** é uma suite modular de alto desempenho dividida em dois modos complementares para extração de piquetes e divisórias de pastagem com cercas retilíneas (mourão a mourão), topologia planar estanque (Zero Overlaps), validação zonal pelo MapBiomas (10m / 30m) e telemetria contínua de hardware.*
 
 ---
 
 ## 🗺️ Visão Geral: As Duas Abordagens Consolidadas
 
-O projeto organiza a segmentação e vetorização cadastral de pastagens em **duas abordagens complementares e independentes**:
+O projeto organiza a segmentação e vetorização cadastral de pastagens em **dois modos complementares e independentes**:
 
 ```
 Vectorization_Pro/
-├── 🖱️ interactive_hq_sam/          # ABORDAGEM 1: Segmentação Interativa Visual (Human-in-the-Loop)
+├── 🖱️ interactive_hq_sam/          # ParcelAnything: INTERACTIVE MODE (Human-in-the-Loop)
 │   ├── backend/                     # API FastAPI + PyTorch ViT-H na GPU (CUDA)
 │   ├── frontend/                    # Interface Web Leaflet com dock de confirmação e refinamento (+/-)
 │   └── run_interactive_app.py       # Inicializador: python run_interactive_app.py --port 8088
 │
-├── ⚙️ lapig_parcel_segmentation/    # ABORDAGEM 2: Segmentação e Vetorização Totalmente Automática em Lote
+├── ⚙️ lapig_parcel_segmentation/    # ParcelAnything: AUTO MODE (Processamento em Lote)
 │   ├── pipeline_parcel_segmentation # Orquestrador principal de ponta a ponta
 │   ├── roi_resolver.py              # Resolução de geometrias (CAR / Shapefile / Coordenadas)
 │   ├── s2_mosaic.py                 # Mosaicos temporais Sentinel-2 Harmonized (GEE CS+)
@@ -38,15 +38,15 @@ Vectorization_Pro/
 │
 ├── 🧠 models/                       # Pesos da rede neural (sam_vit_h_4b8939.pth)
 ├── 📊 results/                      # Vetores gerados (.shp / .gpkg), estatísticas e relatórios de benchmark
-└── 📓 run_in_jupyter.ipynb          # Notebook de demonstração e execução interativa da abordagem automática
+└── 📓 run_in_jupyter.ipynb          # Notebook de demonstração e execução interativa do Auto Mode
 ```
 
-| Critério | Abordagem 1: Interativa Visual (`interactive_hq_sam/`) | Abordagem 2: Automática em Lote (`lapig_parcel_segmentation/`) |
+| Critério | 🖱️ ParcelAnything: Interactive Mode (`interactive_hq_sam/`) | ⚙️ ParcelAnything: Auto Mode (`lapig_parcel_segmentation/`) |
 | :--- | :--- | :--- |
 | **Público / Uso** | Operador humano, auditoria, refinamento fino de perímetros complexos | Processamento massivo de fazendas inteiras ou municípios |
 | **Intervenção** | **Human-in-the-Loop:** Cliques com pontos positivos (`+`) e negativos (`−`) | **Zero intervenção:** Execução autônoma ponta a ponta |
 | **Modelo de IA** | HQ-SAM ViT-H com amostragem pontual interativa e recortes inteligentes | SAMGeo ViT-H com segmentação automática em grade |
-| **Interface** | Web (Leaflet dark glassmorphism na porta 8088 com dock neon) | Linha de comando (CLI) ou script Python / Jupyter |
+| **Interface** | Web (Leaflet dark glassmorphism na porta `8088` com dock neon) | Linha de comando (CLI) ou script Python / Jupyter |
 | **Validação** | O operador valida visualmente e clica em "Confirmar Piquete" | Dominância zonal automática pelo MapBiomas (pastagem) |
 | **Saídas** | GeoJSON exportável pelo navegador com métricas em tempo real | Shapefiles duplos (`segmentacao_pura` e `pastagem_final`) |
 
