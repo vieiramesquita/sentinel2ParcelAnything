@@ -1,0 +1,60 @@
+{
+  "total_duration_sec": 514.0594835281372,
+  "total_duration_str": "0:08:34",
+  "device_name": "NVIDIA GeForce RTX 2080 Ti",
+  "cpu_cores": 20,
+  "total_system_ram_gb": 59.88,
+  "total_vram_gb": 11.0,
+  "phases": [
+    {
+      "phase": "Inicialização",
+      "duration_sec": 0.0007359981536865234
+    },
+    {
+      "phase": "1. Resolução da Área de Interesse (ROI)",
+      "duration_sec": 1.69038987159729
+    },
+    {
+      "phase": "2. Download Mosaico Sentinel-2 (GEE)",
+      "duration_sec": 33.04527187347412
+    },
+    {
+      "phase": "3. Inferência SAMGeo (ViT-H GPU)",
+      "duration_sec": 473.7521324157715
+    },
+    {
+      "phase": "4. Vetorização e Regularização Cadastral (CPU)",
+      "duration_sec": 1.9292566776275635
+    },
+    {
+      "phase": "5. Segmentação Pura no Perímetro CAR",
+      "duration_sec": 0.08487367630004883
+    },
+    {
+      "phase": "6. Classificação Zonal MapBiomas (GEE/CPU)",
+      "duration_sec": 3.556502342224121
+    },
+    {
+      "phase": "7. Exportação e Estatísticas Cadastrais",
+      "duration_sec": 0.00032067298889160156
+    }
+  ],
+  "cpu": {
+    "avg_pct": 2.0,
+    "peak_pct": 4.2
+  },
+  "ram": {
+    "avg_sys_ram_gb": 4.82,
+    "peak_sys_ram_gb": 5.4,
+    "peak_proc_ram_gb": 4.41
+  },
+  "gpu": {
+    "has_cuda": true,
+    "peak_vram_alloc_gb": 6.47,
+    "peak_vram_res_gb": 9.13,
+    "avg_vram_alloc_gb": 2.21,
+    "avg_gpu_util_pct": 3.6,
+    "peak_gpu_util_pct": 18.0,
+    "peak_temp_c": 50
+  }
+}

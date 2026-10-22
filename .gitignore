@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# Deep Learning / Model Weights (>100MB exceeds GitHub push limit)
+models/*.pth
+models/*.pt
+models/*.onnx
+*.pth
+*.pt
+
+# Geospatial Cache & Temporary Rasters
+scratch/
+.tempmediaStorage/
+temp_*.tif
+*.tif.aux.xml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Standalone Public Demo Repository
+sentinel2parcel_test/
+

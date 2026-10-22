@@ -1,0 +1,36 @@
+{
+  "total_duration_sec": 188.54781413078308,
+  "total_duration_str": "0:03:08",
+  "device_name": "NVIDIA GeForce RTX 2080 Ti",
+  "cpu_cores": 20,
+  "total_system_ram_gb": 59.88,
+  "total_vram_gb": 11.0,
+  "phases": [
+    {
+      "phase": "Inicialização",
+      "duration_sec": 0.6874167919158936
+    },
+    {
+      "phase": "Imóvel [1/1] GO-5211008-46C08C6235D74D36BE07B5384A17B156",
+      "duration_sec": 187.8603973388672
+    }
+  ],
+  "cpu": {
+    "avg_pct": 5.2,
+    "peak_pct": 21.3
+  },
+  "ram": {
+    "avg_sys_ram_gb": 45.07,
+    "peak_sys_ram_gb": 58.62,
+    "peak_proc_ram_gb": 58.55
+  },
+  "gpu": {
+    "has_cuda": true,
+    "peak_vram_alloc_gb": 6.47,
+    "peak_vram_res_gb": 9.14,
+    "avg_vram_alloc_gb": 1.5,
+    "avg_gpu_util_pct": 45.2,
+    "peak_gpu_util_pct": 97.0,
+    "peak_temp_c": 69
+  }
+}

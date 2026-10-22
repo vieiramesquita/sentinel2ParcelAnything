@@ -1,0 +1,30 @@
+================================================================================
+📊 RELATÓRIO DE BENCHMARK DE HARDWARE - LAPIG CADASTRAL PIPELINE
+================================================================================
+⏱️  TEMPO TOTAL DE PROCESSAMENTO: 0:03:08 (188.5s)
+🖥️  DISPOSITIVO DE PROCESSAMENTO: NVIDIA GeForce RTX 2080 Ti
+--------------------------------------------------------------------------------
+⏱️  DISTRIBUIÇÃO DE TEMPO POR ETAPA:
+  • Inicialização                              0:00:00 (  0.4%)
+  • Imóvel [1/1] GO-5211008-46C08C6235D74D36BE07B5384A17B156 0:03:07 ( 99.6%)
+--------------------------------------------------------------------------------
+🎮 PLACA DE VÍDEO (GPU - NVIDIA GeForce RTX 2080 Ti):
+  • Pico de VRAM Alocada:           6.47 GB / 11.00 GB (58.8%)
+  • Pico de VRAM Reservada (Cache): 9.14 GB
+  • Média de VRAM Alocada:          1.50 GB
+  • Utilização de GPU (Compute):    Média: 45.2% | Pico: 97.0%
+  • Temperatura Máxima da GPU:     69 °C
+--------------------------------------------------------------------------------
+🧠 MEMÓRIA RAM DO SISTEMA (Total: 59.88 GB):
+  • Pico de Uso Global do Sistema:  58.62 GB (97.9%)
+  • Média de Uso do Sistema:        45.07 GB
+  • Pico do Processo Python (RSS):  58.55 GB
+--------------------------------------------------------------------------------
+💻 PROCESSADOR (CPU - 20 núcleos):
+  • Utilização Média de CPU:        5.2%
+  • Pico Máximo de CPU:             21.3%
+--------------------------------------------------------------------------------
+💡 DIAGNÓSTICO E ANÁLISE DE PERFORMANCE:
+  2. Segurança de VRAM: Estável! O pico (6.47 GB) ficou seguro abaixo do limite de 11.00 GB.
+  3. Vetorização: A regularização de cercas e absorção de ilhas rodou com eficiência na CPU.
+================================================================================

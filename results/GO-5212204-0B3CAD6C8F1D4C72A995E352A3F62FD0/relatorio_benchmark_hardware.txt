@@ -1,0 +1,37 @@
+================================================================================
+📊 RELATÓRIO DE BENCHMARK DE HARDWARE - LAPIG CADASTRAL PIPELINE
+================================================================================
+⏱️  TEMPO TOTAL DE PROCESSAMENTO: 0:07:53 (473.1s)
+🖥️  DISPOSITIVO DE PROCESSAMENTO: NVIDIA GeForce RTX 2080 Ti
+--------------------------------------------------------------------------------
+⏱️  DISTRIBUIÇÃO DE TEMPO POR ETAPA:
+  • Inicialização                              0:00:00 (  0.0%)
+  • 1. Resolução da Área de Interesse (ROI)    0:00:00 (  0.2%)
+  • 2. Download Mosaico Sentinel-2 (GEE)       0:00:15 (  3.3%)
+  • 3. Inferência SAMGeo (ViT-H GPU)           0:07:31 ( 95.4%)
+  • 4. Vetorização e Regularização Cadastral (CPU) 0:00:01 (  0.2%)
+  • 5. Segmentação Pura no Perímetro CAR       0:00:00 (  0.0%)
+  • 6. Classificação Zonal MapBiomas (GEE/CPU) 0:00:03 (  0.8%)
+  • 7. Exportação e Estatísticas Cadastrais    0:00:00 (  0.0%)
+--------------------------------------------------------------------------------
+🎮 PLACA DE VÍDEO (GPU - NVIDIA GeForce RTX 2080 Ti):
+  • Pico de VRAM Alocada:           6.47 GB / 11.00 GB (58.8%)
+  • Pico de VRAM Reservada (Cache): 9.14 GB
+  • Média de VRAM Alocada:          1.21 GB
+  • Utilização de GPU (Compute):    Média: 3.3% | Pico: 16.0%
+  • Temperatura Máxima da GPU:     55 °C
+--------------------------------------------------------------------------------
+🧠 MEMÓRIA RAM DO SISTEMA (Total: 59.88 GB):
+  • Pico de Uso Global do Sistema:  5.56 GB (9.3%)
+  • Média de Uso do Sistema:        5.48 GB
+  • Pico do Processo Python (RSS):  4.48 GB
+--------------------------------------------------------------------------------
+💻 PROCESSADOR (CPU - 20 núcleos):
+  • Utilização Média de CPU:        2.1%
+  • Pico Máximo de CPU:             4.9%
+--------------------------------------------------------------------------------
+💡 DIAGNÓSTICO E ANÁLISE DE PERFORMANCE:
+  1. Gargalo Computacional: A fase de SAMGeo consumiu 95.4% do tempo total.
+  2. Segurança de VRAM: Estável! O pico (6.47 GB) ficou seguro abaixo do limite de 11.00 GB.
+  3. Vetorização: A regularização de cercas e absorção de ilhas rodou com eficiência na CPU.
+================================================================================

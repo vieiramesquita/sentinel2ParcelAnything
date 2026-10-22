@@ -1,0 +1,1975 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAPIG - Dashboard de Performance de Hardware & Vetorização Cadastral</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-base: #07090e;
+            --bg-surface: #0e131f;
+            --bg-card: rgba(18, 24, 38, 0.75);
+            --bg-card-hover: rgba(26, 35, 56, 0.85);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-active: rgba(0, 242, 254, 0.4);
+            
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            --neon-cyan: #00f2fe;
+            --neon-blue: #3b82f6;
+            --neon-purple: #a855f7;
+            --neon-magenta: #ec4899;
+            --neon-emerald: #10b981;
+            --neon-amber: #f59e0b;
+            --neon-rose: #f43f5e;
+            
+            --font-sans: 'Plus Jakarta Sans', sans-serif;
+            --font-heading: 'Outfit', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            
+            --radius-md: 12px;
+            --radius-lg: 18px;
+            --shadow-glow: 0 8px 32px 0 rgba(0, 242, 254, 0.07);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(0, 242, 254, 0.04) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.04) 0%, transparent 40%),
+                linear-gradient(180deg, #07090e 0%, #0a0e17 100%);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            min-height: 100vh;
+            padding: 28px;
+            line-height: 1.5;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 22px 28px;
+            backdrop-filter: blur(20px);
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-glow);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .brand-logo {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #07090e;
+            box-shadow: 0 4px 20px rgba(0, 242, 254, 0.3);
+        }
+
+        .brand-text h1 {
+            font-family: var(--font-heading);
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(90deg, #ffffff, var(--neon-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-text p {
+            font-size: 0.86rem;
+            color: var(--text-secondary);
+        }
+
+        .header-meta {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+        }
+
+        .badge.highlight {
+            background: rgba(0, 242, 254, 0.08);
+            border-color: rgba(0, 242, 254, 0.3);
+            color: var(--neon-cyan);
+            font-weight: 600;
+        }
+
+        /* KPI Cards Grid */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 18px;
+            margin-bottom: 24px;
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            backdrop-filter: blur(16px);
+            transition: transform 0.2s ease, border-color 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--border-active);
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--card-accent, var(--neon-cyan));
+        }
+
+        .kpi-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .kpi-value {
+            font-family: var(--font-heading);
+            font-size: 1.85rem;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 1.2;
+            margin-bottom: 4px;
+        }
+
+        .kpi-subtext {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        /* Controls & Filter Bar */
+        .filter-bar {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 14px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+            backdrop-filter: blur(16px);
+        }
+
+        .filter-pills {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .pill-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            font-family: var(--font-sans);
+            font-size: 0.82rem;
+            font-weight: 500;
+            padding: 6px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .pill-btn:hover, .pill-btn.active {
+            background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(168, 85, 247, 0.2));
+            border-color: var(--neon-cyan);
+            color: #ffffff;
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 6px 12px;
+            min-width: 260px;
+        }
+
+        .search-box input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #ffffff;
+            font-size: 0.85rem;
+            font-family: var(--font-sans);
+            width: 100%;
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* Tabs Navigation */
+        .tabs-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-subtle);
+            padding-bottom: 12px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-family: var(--font-heading);
+            font-size: 0.95rem;
+            font-weight: 600;
+            padding: 8px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .tab-btn.active {
+            color: var(--neon-cyan);
+            background: rgba(0, 242, 254, 0.08);
+            border: 1px solid rgba(0, 242, 254, 0.25);
+        }
+
+        /* Grid Charts */
+        .charts-container {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .charts-container.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(540px, 1fr));
+            gap: 22px;
+            margin-bottom: 24px;
+        }
+
+        .charts-grid.full {
+            grid-template-columns: 1fr;
+        }
+
+        .chart-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 22px;
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-glow);
+            position: relative;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .chart-title {
+            font-family: var(--font-heading);
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chart-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .chart-plot {
+            width: 100%;
+            height: 420px;
+        }
+
+        .chart-plot.tall {
+            height: 520px;
+        }
+
+        /* Table */
+        .table-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 22px;
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-glow);
+            margin-bottom: 24px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+
+        th {
+            font-family: var(--font-heading);
+            font-weight: 600;
+            color: var(--text-secondary);
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border-subtle);
+            cursor: pointer;
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        th:hover {
+            color: var(--neon-cyan);
+        }
+
+        td {
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .id-link {
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            color: var(--neon-cyan);
+            text-decoration: none;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            font-family: var(--font-mono);
+        }
+
+        .tag.normal { background: rgba(16, 185, 129, 0.15); color: var(--neon-emerald); }
+        .tag.warning { background: rgba(245, 158, 11, 0.15); color: var(--neon-amber); }
+        .tag.danger { background: rgba(244, 63, 94, 0.15); color: var(--neon-rose); }
+        .tag.purple { background: rgba(168, 85, 247, 0.15); color: var(--neon-purple); }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        @media (max-width: 768px) {
+            body { padding: 14px; }
+            .charts-grid { grid-template-columns: 1fr; }
+            .header { flex-direction: column; align-items: flex-start; gap: 14px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="brand">
+            <div class="brand-logo">
+                <i data-lucide="cpu" style="width: 26px; height: 26px;"></i>
+            </div>
+            <div class="brand-text">
+                <h1>LAPIG Performance Intelligence Dashboard</h1>
+                <p>Análise de Hardware, VRAM, Térmicas e Eficiência Cadastral (Sentinel-2 + SAMGeo ViT-H)</p>
+            </div>
+        </div>
+        <div class="header-meta">
+            <span class="badge highlight"><i data-lucide="zap" style="width: 14px; height: 14px;"></i> RTX 2080 Ti (11 GB)</span>
+            <span class="badge"><i data-lucide="layers" style="width: 14px; height: 14px;"></i> 21 Imóveis Monitorados</span>
+            <span class="badge"><i data-lucide="shield-check" style="width: 14px; height: 14px;"></i> Zero VRAM Leak Validado</span>
+        </div>
+    </header>
+
+    <!-- Top KPI Cards -->
+    <section class="kpi-grid">
+        <div class="kpi-card" style="--card-accent: var(--neon-cyan);">
+            <div class="kpi-title">
+                <span>Imóveis Monitorados</span>
+                <i data-lucide="map" style="width: 16px; height: 16px; color: var(--neon-cyan);"></i>
+            </div>
+            <div class="kpi-value">21</div>
+            <div class="kpi-subtext">Propriedades rurais cadastradas</div>
+        </div>
+
+        <div class="kpi-card" style="--card-accent: var(--neon-emerald);">
+            <div class="kpi-title">
+                <span>Área Total no CAR</span>
+                <i data-lucide="maximize" style="width: 16px; height: 16px; color: var(--neon-emerald);"></i>
+            </div>
+            <div class="kpi-value">49,760.0 <span style="font-size: 1rem; font-weight: 500; color: var(--text-muted);">ha</span></div>
+            <div class="kpi-subtext">Média: 2369.5 ha / fazenda</div>
+        </div>
+
+        <div class="kpi-card" style="--card-accent: var(--neon-blue);">
+            <div class="kpi-title">
+                <span>Piquetes Cadastrais</span>
+                <i data-lucide="grid" style="width: 16px; height: 16px; color: var(--neon-blue);"></i>
+            </div>
+            <div class="kpi-value">1,861</div>
+            <div class="kpi-subtext">Retificados com 0 sobreposições</div>
+        </div>
+
+        <div class="kpi-card" style="--card-accent: var(--neon-purple);">
+            <div class="kpi-title">
+                <span>Pico VRAM Reservada</span>
+                <i data-lucide="hard-drive" style="width: 16px; height: 16px; color: var(--neon-purple);"></i>
+            </div>
+            <div class="kpi-value">26.02 <span style="font-size: 1rem; font-weight: 500; color: var(--text-muted);">GB</span></div>
+            <div class="kpi-subtext">Alocada real máx: 9.54 GB</div>
+        </div>
+
+        <div class="kpi-card" style="--card-accent: var(--neon-rose);">
+            <div class="kpi-title">
+                <span>Temperatura Máx GPU</span>
+                <i data-lucide="thermometer" style="width: 16px; height: 16px; color: var(--neon-rose);"></i>
+            </div>
+            <div class="kpi-value">71 <span style="font-size: 1rem; font-weight: 500; color: var(--text-muted);">°C</span></div>
+            <div class="kpi-subtext">Média térmica de pico: 56.1 °C</div>
+        </div>
+
+        <div class="kpi-card" style="--card-accent: var(--neon-amber);">
+            <div class="kpi-title">
+                <span>Tempo Médio / Imóvel</span>
+                <i data-lucide="clock" style="width: 16px; height: 16px; color: var(--neon-amber);"></i>
+            </div>
+            <div class="kpi-value">5.8 <span style="font-size: 1rem; font-weight: 500; color: var(--text-muted);">min</span></div>
+            <div class="kpi-subtext">350.9s por propriedade</div>
+        </div>
+    </section>
+
+    <!-- Filter & Search Bar -->
+    <section class="filter-bar">
+        <div class="filter-pills">
+            <button class="pill-btn active" onclick="applyPreset('all')">Todos (21)</button>
+            <button class="pill-btn" onclick="applyPreset('large')">Área > 2.000 ha</button>
+            <button class="pill-btn" onclick="applyPreset('medium')">500 a 2.000 ha</button>
+            <button class="pill-btn" onclick="applyPreset('small')">Área &lt; 500 ha</button>
+            <button class="pill-btn" onclick="applyPreset('high_vram')">Alta VRAM (> 8 GB)</button>
+            <button class="pill-btn" onclick="applyPreset('ms')">Mato Grosso do Sul</button>
+        </div>
+        <div class="search-box">
+            <i data-lucide="search" style="width: 16px; height: 16px; color: var(--text-muted);"></i>
+            <input type="text" id="searchInput" placeholder="Buscar por ID ou Município..." oninput="onSearchInput(event)">
+        </div>
+    </section>
+
+    <!-- Tabs Navigation -->
+    <nav class="tabs-nav">
+        <button class="tab-btn active" onclick="switchTab('vram')"><i data-lucide="database"></i> Memória de Vídeo (VRAM)</button>
+        <button class="tab-btn" onclick="switchTab('thermal')"><i data-lucide="flame"></i> Térmicas & Compute GPU (Violino)</button>
+        <button class="tab-btn" onclick="switchTab('efficiency')"><i data-lucide="activity"></i> Eficiência & Fases do Pipeline</button>
+        <button class="tab-btn" onclick="switchTab('table')"><i data-lucide="table"></i> Tabela Auditável de Imóveis</button>
+    </nav>
+
+    <!-- TAB 1: VRAM Analysis -->
+    <div id="tab-vram" class="charts-container active">
+        <div class="charts-grid">
+            <!-- Chart 1A: VRAM vs Área -->
+            <div class="chart-box">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">
+                            <i data-lucide="scatter-chart" style="color: var(--neon-cyan);"></i>
+                            VRAM (Alocada vs. Reservada) vs. Área do Imóvel
+                        </div>
+                        <div class="chart-desc">Relação entre dimensão da fazenda e demanda no Caching Allocator da GPU</div>
+                    </div>
+                    <button class="pill-btn" id="btnToggleLogScale" onclick="toggleAreaScale()">Escala Log</button>
+                </div>
+                <div id="chart-vram-area" class="chart-plot"></div>
+            </div>
+
+            <!-- Chart 1B: Violino VRAM -->
+            <div class="chart-box">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">
+                            <i data-lucide="bar-chart-2" style="color: var(--neon-purple);"></i>
+                            Gráfico de Violino: Distribuição de VRAM (Alocada vs. Reservada)
+                        </div>
+                        <div class="chart-desc">Densidade contínua revelando o bolsão de retenção de cache do PyTorch</div>
+                    </div>
+                </div>
+                <div id="chart-vram-violin" class="chart-plot"></div>
+            </div>
+        </div>
+
+        <div class="charts-grid full">
+            <!-- Chart 1C: Cache Overhead -->
+            <div class="chart-box">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">
+                            <i data-lucide="pie-chart" style="color: var(--neon-magenta);"></i>
+                            Sobrecarga de Cache da VRAM (Reservada - Alocada) por Imóvel
+                        </div>
+                        <div class="chart-desc">Quantidade exata de memória liberada a cada iteração pelo comando `clear_gpu_memory()`</div>
+                    </div>
+                </div>
+                <div id="chart-cache-overhead" class="chart-plot"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: Thermal & GPU Compute -->
+    <div id="tab-thermal" class="charts-container">
+        <div class="charts-grid">
+            <!-- Chart 2A: Violino Térmico e Compute -->
+            <div class="chart-box">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">
+                            <i data-lucide="thermometer-snowflake" style="color: var(--neon-rose);"></i>
+                            Gráfico de Violino: Temperaturas & Carga Computacional
+                        </div>
+                        <div class="chart-desc">Distribuição de temperatura máxima e carga (%) dos núcleos CUDA da GPU</div>
+                    </div>
+                </div>
+                <div id="chart-thermal-violin" class="chart-plot"></div>
+            </div>
+
+            <!-- Chart 2B: Correlação Térmica vs Tempo -->
+            <div class="chart-box">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">
+                            <i data-lucide="zap" style="color: var(--neon-amber);"></i>
+                            Temperatura Máxima vs. Duração do Processamento
+                        </div>
+                        <div class="chart-desc">Aquecimento operacional da RTX 2080 Ti em função do tempo de estresse contínuo</div>
+                    </div>
+                </div>
+                <div id="chart-temp-time" class="chart-plot"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: Efficiency & Phases -->
+    <div id="tab-efficiency" class="charts-container">
+        <div class="charts-grid">
+            <!-- Chart 3A: Bubble Chart Eficiência -->
+            <div class="chart-box">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">
+                            <i data-lucide="target" style="color: var(--neon-blue);"></i>
+                            Matriz de Eficiência: Tempo vs. Área vs. Piquetes
+                        </div>
+                        <div class="chart-desc">Tamanho da bolha = Quantidade de Piquetes | Cor = Pico de VRAM Alocada</div>
+                    </div>
+                </div>
+                <div id="chart-bubble-efficiency" class="chart-plot"></div>
+            </div>
+
+            <!-- Chart 3B: Piquetes vs Área -->
+            <div class="chart-box">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">
+                            <i data-lucide="layers" style="color: var(--neon-emerald);"></i>
+                            Densidade Cadastral: Piquetes vs. Área (ha)
+                        </div>
+                        <div class="chart-desc">Intensidade de divisão de pastagem por dimensão fundiária</div>
+                    </div>
+                </div>
+                <div id="chart-paddocks-area" class="chart-plot"></div>
+            </div>
+        </div>
+
+        <div class="charts-grid full">
+            <!-- Chart 3C: Decomposição por Fases -->
+            <div class="chart-box">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">
+                            <i data-lucide="timer" style="color: var(--neon-cyan);"></i>
+                            Decomposição Temporal por Etapa do Pipeline (Stacked Bar)
+                        </div>
+                        <div class="chart-desc">Comprovação do gargalo computacional: SAMGeo ViT-H consome 80-95% do tempo total</div>
+                    </div>
+                </div>
+                <div id="chart-phases-breakdown" class="chart-plot tall"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 4: Table -->
+    <div id="tab-table" class="charts-container">
+        <div class="table-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="font-family: var(--font-heading); font-size: 1.15rem; color: #ffffff;">📋 Registros Individuais de Imóveis Auditados</h3>
+                <button class="pill-btn" onclick="exportCSV()"><i data-lucide="download" style="width: 14px; height: 14px; vertical-align: middle;"></i> Exportar para CSV</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th onclick="sortTable('id')">Código do Imóvel</th>
+                        <th onclick="sortTable('municipio')">Município</th>
+                        <th onclick="sortTable('car_area_ha')">Área CAR (ha)</th>
+                        <th onclick="sortTable('paddocks_count')">Piquetes</th>
+                        <th onclick="sortTable('total_min')">Duração</th>
+                        <th onclick="sortTable('vram_alloc_peak_gb')">VRAM Aloc.</th>
+                        <th onclick="sortTable('vram_res_peak_gb')">VRAM Res. (Cache)</th>
+                        <th onclick="sortTable('gpu_temp_max')">Temp. GPU</th>
+                        <th onclick="sortTable('gpu_util_avg')">Compute Load</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>LAPIG / UFG - Laboratório de Processamento de Imagens e Geoprocessamento • Pipeline Cadastral Watertight com Zero Sobreposição</p>
+    </footer>
+
+    <!-- Dados Embutidos -->
+    <script id="benchmark-data" type="application/json">
+[
+  {
+    "id": "GO-5203500-366A293867A24EF5A446DA91E23F8548",
+    "municipio": "Bom Jesus de Goias",
+    "car_area_ha": 4476.31,
+    "paddocks_count": 138,
+    "paddock_area_ha": 3631.39,
+    "pure_parcels_count": 178,
+    "pure_area_ha": 4297.72,
+    "total_sec": 571.89,
+    "total_min": 9.53,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 17.06,
+    "vram_alloc_avg_gb": 1.77,
+    "gpu_util_avg": 13.0,
+    "gpu_util_peak": 100.0,
+    "gpu_temp_max": 58,
+    "ram_peak_sys_gb": 7.03,
+    "ram_avg_sys_gb": 2.82,
+    "ram_peak_proc_gb": 5.76,
+    "cpu_util_avg": 3.0,
+    "cpu_util_peak": 15.5,
+    "sam_duration_sec": 487.08,
+    "vectorize_duration_sec": 2.94,
+    "s2_download_sec": 75.63,
+    "mapbiomas_sec": 4.09,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 2.06,
+      "2. Download Mosaico Sentinel-2 (GEE)": 75.63,
+      "3. Inferência SAMGeo (ViT-H GPU)": 487.08,
+      "4. Vetorização e Regularização Cadastral (CPU)": 2.94,
+      "5. Segmentação Pura no Perímetro CAR": 0.09,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 4.09,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5203807-146172AFEDAF44FC82CEEC3A2B92D5F1",
+    "municipio": "Britania",
+    "car_area_ha": 2629.8,
+    "paddocks_count": 75,
+    "paddock_area_ha": 2539.79,
+    "pure_parcels_count": 79,
+    "pure_area_ha": 2562.06,
+    "total_sec": 478.07,
+    "total_min": 7.97,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 10.23,
+    "vram_alloc_avg_gb": 0.23,
+    "gpu_util_avg": 2.6,
+    "gpu_util_peak": 56.0,
+    "gpu_temp_max": 52,
+    "ram_peak_sys_gb": 7.7,
+    "ram_avg_sys_gb": 3.9,
+    "ram_peak_proc_gb": 6.65,
+    "cpu_util_avg": 1.4,
+    "cpu_util_peak": 13.5,
+    "sam_duration_sec": 419.73,
+    "vectorize_duration_sec": 1.85,
+    "s2_download_sec": 50.31,
+    "mapbiomas_sec": 4.43,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 1.66,
+      "2. Download Mosaico Sentinel-2 (GEE)": 50.31,
+      "3. Inferência SAMGeo (ViT-H GPU)": 419.73,
+      "4. Vetorização e Regularização Cadastral (CPU)": 1.85,
+      "5. Segmentação Pura no Perímetro CAR": 0.08,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 4.43,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5204409-01D1AD1F9586415E9D46BF93115D27DF",
+    "municipio": "Caiaponia",
+    "car_area_ha": 798.23,
+    "paddocks_count": 42,
+    "paddock_area_ha": 591.05,
+    "pure_parcels_count": 54,
+    "pure_area_ha": 649.23,
+    "total_sec": 153.03,
+    "total_min": 2.55,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.14,
+    "vram_alloc_avg_gb": 0.44,
+    "gpu_util_avg": 1.8,
+    "gpu_util_peak": 33.0,
+    "gpu_temp_max": 53,
+    "ram_peak_sys_gb": 7.86,
+    "ram_avg_sys_gb": 5.36,
+    "ram_peak_proc_gb": 6.8,
+    "cpu_util_avg": 2.4,
+    "cpu_util_peak": 13.4,
+    "sam_duration_sec": 131.22,
+    "vectorize_duration_sec": 0.66,
+    "s2_download_sec": 16.89,
+    "mapbiomas_sec": 3.21,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 0.99,
+      "2. Download Mosaico Sentinel-2 (GEE)": 16.89,
+      "3. Inferência SAMGeo (ViT-H GPU)": 131.22,
+      "4. Vetorização e Regularização Cadastral (CPU)": 0.66,
+      "5. Segmentação Pura no Perímetro CAR": 0.07,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 3.21,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5205521-DA104FC8E15A44DFB6CB4F0656C1E409",
+    "municipio": "Colinas do Sul",
+    "car_area_ha": 896.58,
+    "paddocks_count": 35,
+    "paddock_area_ha": 776.79,
+    "pure_parcels_count": 43,
+    "pure_area_ha": 812.01,
+    "total_sec": 401.07,
+    "total_min": 6.68,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.14,
+    "vram_alloc_avg_gb": 1.45,
+    "gpu_util_avg": 3.4,
+    "gpu_util_peak": 17.0,
+    "gpu_temp_max": 51,
+    "ram_peak_sys_gb": 5.42,
+    "ram_avg_sys_gb": 5.25,
+    "ram_peak_proc_gb": 4.41,
+    "cpu_util_avg": 1.5,
+    "cpu_util_peak": 3.3,
+    "sam_duration_sec": 341.48,
+    "vectorize_duration_sec": 0.67,
+    "s2_download_sec": 27.44,
+    "mapbiomas_sec": 30.41,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 1.0,
+      "2. Download Mosaico Sentinel-2 (GEE)": 27.44,
+      "3. Inferência SAMGeo (ViT-H GPU)": 341.48,
+      "4. Vetorização e Regularização Cadastral (CPU)": 0.67,
+      "5. Segmentação Pura no Perímetro CAR": 0.07,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 30.41,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5206404-499D0D75A1394A6D915AE91FF8DB8700",
+    "municipio": "Crixas",
+    "car_area_ha": 233.81,
+    "paddocks_count": 37,
+    "paddock_area_ha": 239.67,
+    "pure_parcels_count": 37,
+    "pure_area_ha": 239.67,
+    "total_sec": 350.47,
+    "total_min": 5.84,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.14,
+    "vram_alloc_avg_gb": 1.67,
+    "gpu_util_avg": 6.1,
+    "gpu_util_peak": 24.0,
+    "gpu_temp_max": 52,
+    "ram_peak_sys_gb": 5.42,
+    "ram_avg_sys_gb": 5.3,
+    "ram_peak_proc_gb": 4.41,
+    "cpu_util_avg": 2.4,
+    "cpu_util_peak": 4.5,
+    "sam_duration_sec": 311.65,
+    "vectorize_duration_sec": 0.77,
+    "s2_download_sec": 32.01,
+    "mapbiomas_sec": 5.02,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 0.93,
+      "2. Download Mosaico Sentinel-2 (GEE)": 32.01,
+      "3. Inferência SAMGeo (ViT-H GPU)": 311.65,
+      "4. Vetorização e Regularização Cadastral (CPU)": 0.77,
+      "5. Segmentação Pura no Perímetro CAR": 0.08,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 5.02,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5207402-1D40C8AAD6504E05B30DA04D7E19457F",
+    "municipio": "Edeia",
+    "car_area_ha": 530.02,
+    "paddocks_count": 45,
+    "paddock_area_ha": 369.7,
+    "pure_parcels_count": 45,
+    "pure_area_ha": 369.7,
+    "total_sec": 202.38,
+    "total_min": 3.37,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.13,
+    "vram_alloc_avg_gb": 1.51,
+    "gpu_util_avg": 43.5,
+    "gpu_util_peak": 97.0,
+    "gpu_temp_max": 67,
+    "ram_peak_sys_gb": 42.53,
+    "ram_avg_sys_gb": 33.18,
+    "ram_peak_proc_gb": 40.03,
+    "cpu_util_avg": 4.6,
+    "cpu_util_peak": 29.1,
+    "sam_duration_sec": 115.15,
+    "vectorize_duration_sec": 1.26,
+    "s2_download_sec": 39.12,
+    "mapbiomas_sec": 2.95,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 43.82,
+      "2. Download Mosaico Sentinel-2 (GEE)": 39.12,
+      "3. Inferência SAMGeo (ViT-H GPU)": 115.15,
+      "4. Vetorização e Regularização Cadastral (CPU)": 1.26,
+      "5. Segmentação Pura no Perímetro CAR": 0.08,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 2.95,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5208707-4045057E90C948D999280F125FD7FD6B",
+    "municipio": "Goiania",
+    "car_area_ha": 70.28,
+    "paddocks_count": 10,
+    "paddock_area_ha": 65.32,
+    "pure_parcels_count": 11,
+    "pure_area_ha": 66.7,
+    "total_sec": 428.53,
+    "total_min": 7.14,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.14,
+    "vram_alloc_avg_gb": 2.3,
+    "gpu_util_avg": 1.6,
+    "gpu_util_peak": 31.0,
+    "gpu_temp_max": 51,
+    "ram_peak_sys_gb": 5.43,
+    "ram_avg_sys_gb": 5.27,
+    "ram_peak_proc_gb": 4.42,
+    "cpu_util_avg": 3.9,
+    "cpu_util_peak": 5.1,
+    "sam_duration_sec": 411.42,
+    "vectorize_duration_sec": 0.23,
+    "s2_download_sec": 13.6,
+    "mapbiomas_sec": 2.23,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 0.98,
+      "2. Download Mosaico Sentinel-2 (GEE)": 13.6,
+      "3. Inferência SAMGeo (ViT-H GPU)": 411.42,
+      "4. Vetorização e Regularização Cadastral (CPU)": 0.23,
+      "5. Segmentação Pura no Perímetro CAR": 0.07,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 2.23,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5208905-08E150868E2A43CDBB23AC8FEE459017",
+    "municipio": "Goias",
+    "car_area_ha": 828.95,
+    "paddocks_count": 76,
+    "paddock_area_ha": 654.31,
+    "pure_parcels_count": 76,
+    "pure_area_ha": 654.31,
+    "total_sec": 167.49,
+    "total_min": 2.79,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.14,
+    "vram_alloc_avg_gb": 0.07,
+    "gpu_util_avg": 0.6,
+    "gpu_util_peak": 29.0,
+    "gpu_temp_max": 52,
+    "ram_peak_sys_gb": 7.67,
+    "ram_avg_sys_gb": 5.08,
+    "ram_peak_proc_gb": 6.64,
+    "cpu_util_avg": 1.6,
+    "cpu_util_peak": 14.1,
+    "sam_duration_sec": 125.73,
+    "vectorize_duration_sec": 1.71,
+    "s2_download_sec": 36.44,
+    "mapbiomas_sec": 2.23,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 1.31,
+      "2. Download Mosaico Sentinel-2 (GEE)": 36.44,
+      "3. Inferência SAMGeo (ViT-H GPU)": 125.73,
+      "4. Vetorização e Regularização Cadastral (CPU)": 1.71,
+      "5. Segmentação Pura no Perímetro CAR": 0.08,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 2.23,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5208905-F496428818874B9CBBA57AD8132348B1",
+    "municipio": "Goias",
+    "car_area_ha": 10828.8,
+    "paddocks_count": 345,
+    "paddock_area_ha": 10122.84,
+    "pure_parcels_count": 354,
+    "pure_area_ha": 10230.18,
+    "total_sec": 490.63,
+    "total_min": 8.18,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 9.54,
+    "vram_res_peak_gb": 16.09,
+    "vram_alloc_avg_gb": 3.74,
+    "gpu_util_avg": 77.1,
+    "gpu_util_peak": 100.0,
+    "gpu_temp_max": 71,
+    "ram_peak_sys_gb": 41.56,
+    "ram_avg_sys_gb": 32.79,
+    "ram_peak_proc_gb": 40.01,
+    "cpu_util_avg": 6.2,
+    "cpu_util_peak": 47.2,
+    "sam_duration_sec": 429.49,
+    "vectorize_duration_sec": 9.03,
+    "s2_download_sec": 2.07,
+    "mapbiomas_sec": 5.1,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 44.84,
+      "2. Download Mosaico Sentinel-2 (GEE)": 2.07,
+      "3. Inferência SAMGeo (ViT-H GPU)": 429.49,
+      "4. Vetorização e Regularização Cadastral (CPU)": 9.03,
+      "5. Segmentação Pura no Perímetro CAR": 0.1,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 5.1,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5209903-C8653C1E63894890B5883B8529A3A100",
+    "municipio": "Iaciara",
+    "car_area_ha": 532.2,
+    "paddocks_count": 32,
+    "paddock_area_ha": 516.44,
+    "pure_parcels_count": 32,
+    "pure_area_ha": 516.44,
+    "total_sec": 384.46,
+    "total_min": 6.41,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.14,
+    "vram_alloc_avg_gb": 1.12,
+    "gpu_util_avg": 2.0,
+    "gpu_util_peak": 6.0,
+    "gpu_temp_max": 49,
+    "ram_peak_sys_gb": 5.41,
+    "ram_avg_sys_gb": 4.91,
+    "ram_peak_proc_gb": 4.41,
+    "cpu_util_avg": 1.1,
+    "cpu_util_peak": 3.1,
+    "sam_duration_sec": 351.19,
+    "vectorize_duration_sec": 0.39,
+    "s2_download_sec": 28.5,
+    "mapbiomas_sec": 3.27,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 1.03,
+      "2. Download Mosaico Sentinel-2 (GEE)": 28.5,
+      "3. Inferência SAMGeo (ViT-H GPU)": 351.19,
+      "4. Vetorização e Regularização Cadastral (CPU)": 0.39,
+      "5. Segmentação Pura no Perímetro CAR": 0.07,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 3.27,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5210109-9C728F04622C476CAFA5D429E4F4CFE0",
+    "municipio": "Ipameri",
+    "car_area_ha": 1763.45,
+    "paddocks_count": 124,
+    "paddock_area_ha": 1646.15,
+    "pure_parcels_count": 134,
+    "pure_area_ha": 1688.19,
+    "total_sec": 514.06,
+    "total_min": 8.57,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.13,
+    "vram_alloc_avg_gb": 2.21,
+    "gpu_util_avg": 3.6,
+    "gpu_util_peak": 18.0,
+    "gpu_temp_max": 50,
+    "ram_peak_sys_gb": 5.4,
+    "ram_avg_sys_gb": 4.82,
+    "ram_peak_proc_gb": 4.41,
+    "cpu_util_avg": 2.0,
+    "cpu_util_peak": 4.2,
+    "sam_duration_sec": 473.75,
+    "vectorize_duration_sec": 1.93,
+    "s2_download_sec": 33.05,
+    "mapbiomas_sec": 3.56,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 1.69,
+      "2. Download Mosaico Sentinel-2 (GEE)": 33.05,
+      "3. Inferência SAMGeo (ViT-H GPU)": 473.75,
+      "4. Vetorização e Regularização Cadastral (CPU)": 1.93,
+      "5. Segmentação Pura no Perímetro CAR": 0.08,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 3.56,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5211008-46C08C6235D74D36BE07B5384A17B156",
+    "municipio": "Itapirapuã (GO)",
+    "car_area_ha": 193.59,
+    "paddocks_count": 14,
+    "paddock_area_ha": 187.01,
+    "pure_parcels_count": 14,
+    "pure_area_ha": 187.01,
+    "total_sec": 185.68,
+    "total_min": 3.09,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.14,
+    "vram_alloc_avg_gb": 1.57,
+    "gpu_util_avg": 46.4,
+    "gpu_util_peak": 97.0,
+    "gpu_temp_max": 69,
+    "ram_peak_sys_gb": 58.64,
+    "ram_avg_sys_gb": 44.96,
+    "ram_peak_proc_gb": 58.55,
+    "cpu_util_avg": 5.2,
+    "cpu_util_peak": 23.9,
+    "sam_duration_sec": 114.1,
+    "vectorize_duration_sec": 0.26,
+    "s2_download_sec": 10.86,
+    "mapbiomas_sec": 3.78,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 56.61,
+      "2. Download Mosaico Sentinel-2 (GEE)": 10.86,
+      "3. Inferência SAMGeo (ViT-H GPU)": 114.1,
+      "4. Vetorização e Regularização Cadastral (CPU)": 0.26,
+      "5. Segmentação Pura no Perímetro CAR": 0.07,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 3.78,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5211909-AD13173067F84A12B45E4659178EA92E",
+    "municipio": "Jatai",
+    "car_area_ha": 9107.04,
+    "paddocks_count": 234,
+    "paddock_area_ha": 8714.76,
+    "pure_parcels_count": 248,
+    "pure_area_ha": 8870.7,
+    "total_sec": 568.68,
+    "total_min": 9.48,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 8.53,
+    "vram_res_peak_gb": 26.02,
+    "vram_alloc_avg_gb": 4.61,
+    "gpu_util_avg": 58.5,
+    "gpu_util_peak": 100.0,
+    "gpu_temp_max": 64,
+    "ram_peak_sys_gb": 5.55,
+    "ram_avg_sys_gb": 5.47,
+    "ram_peak_proc_gb": 4.49,
+    "cpu_util_avg": 5.0,
+    "cpu_util_peak": 5.7,
+    "sam_duration_sec": 499.93,
+    "vectorize_duration_sec": 4.92,
+    "s2_download_sec": 57.92,
+    "mapbiomas_sec": 4.77,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 1.04,
+      "2. Download Mosaico Sentinel-2 (GEE)": 57.92,
+      "3. Inferência SAMGeo (ViT-H GPU)": 499.93,
+      "4. Vetorização e Regularização Cadastral (CPU)": 4.92,
+      "5. Segmentação Pura no Perímetro CAR": 0.1,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 4.77,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5212204-0B3CAD6C8F1D4C72A995E352A3F62FD0",
+    "municipio": "Jussara",
+    "car_area_ha": 420.28,
+    "paddocks_count": 42,
+    "paddock_area_ha": 401.28,
+    "pure_parcels_count": 42,
+    "pure_area_ha": 401.28,
+    "total_sec": 473.09,
+    "total_min": 7.88,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.14,
+    "vram_alloc_avg_gb": 1.21,
+    "gpu_util_avg": 3.3,
+    "gpu_util_peak": 16.0,
+    "gpu_temp_max": 55,
+    "ram_peak_sys_gb": 5.56,
+    "ram_avg_sys_gb": 5.48,
+    "ram_peak_proc_gb": 4.48,
+    "cpu_util_avg": 2.1,
+    "cpu_util_peak": 4.9,
+    "sam_duration_sec": 451.47,
+    "vectorize_duration_sec": 1.02,
+    "s2_download_sec": 15.7,
+    "mapbiomas_sec": 3.88,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 0.94,
+      "2. Download Mosaico Sentinel-2 (GEE)": 15.7,
+      "3. Inferência SAMGeo (ViT-H GPU)": 451.47,
+      "4. Vetorização e Regularização Cadastral (CPU)": 1.02,
+      "5. Segmentação Pura no Perímetro CAR": 0.08,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 3.88,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5212204-38A49ED0A1184392AEA7DEDDAED2744B",
+    "municipio": "Jussara",
+    "car_area_ha": 514.25,
+    "paddocks_count": 29,
+    "paddock_area_ha": 503.03,
+    "pure_parcels_count": 29,
+    "pure_area_ha": 503.03,
+    "total_sec": 150.24,
+    "total_min": 2.5,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.14,
+    "vram_alloc_avg_gb": 0.38,
+    "gpu_util_avg": 3.1,
+    "gpu_util_peak": 24.0,
+    "gpu_temp_max": 52,
+    "ram_peak_sys_gb": 7.9,
+    "ram_avg_sys_gb": 6.1,
+    "ram_peak_proc_gb": 6.84,
+    "cpu_util_avg": 3.1,
+    "cpu_util_peak": 14.0,
+    "sam_duration_sec": 133.92,
+    "vectorize_duration_sec": 0.37,
+    "s2_download_sec": 9.82,
+    "mapbiomas_sec": 4.24,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 1.8,
+      "2. Download Mosaico Sentinel-2 (GEE)": 9.82,
+      "3. Inferência SAMGeo (ViT-H GPU)": 133.92,
+      "4. Vetorização e Regularização Cadastral (CPU)": 0.37,
+      "5. Segmentação Pura no Perímetro CAR": 0.08,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 4.24,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5212501-89730760C68B40AFAB2DFC97AE263317",
+    "municipio": "Luziania",
+    "car_area_ha": 167.76,
+    "paddocks_count": 16,
+    "paddock_area_ha": 177.02,
+    "pure_parcels_count": 17,
+    "pure_area_ha": 178.04,
+    "total_sec": 386.22,
+    "total_min": 6.44,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.14,
+    "vram_alloc_avg_gb": 1.7,
+    "gpu_util_avg": 10.7,
+    "gpu_util_peak": 40.0,
+    "gpu_temp_max": 53,
+    "ram_peak_sys_gb": 5.47,
+    "ram_avg_sys_gb": 5.43,
+    "ram_peak_proc_gb": 4.47,
+    "cpu_util_avg": 2.2,
+    "cpu_util_peak": 3.2,
+    "sam_duration_sec": 362.57,
+    "vectorize_duration_sec": 0.26,
+    "s2_download_sec": 16.07,
+    "mapbiomas_sec": 5.63,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 1.61,
+      "2. Download Mosaico Sentinel-2 (GEE)": 16.07,
+      "3. Inferência SAMGeo (ViT-H GPU)": 362.57,
+      "4. Vetorização e Regularização Cadastral (CPU)": 0.26,
+      "5. Segmentação Pura no Perímetro CAR": 0.07,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 5.63,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5214838-32EB159D2A3C43728A560A168E62D325",
+    "municipio": "Nova Crixas",
+    "car_area_ha": 9719.91,
+    "paddocks_count": 224,
+    "paddock_area_ha": 7425.25,
+    "pure_parcels_count": 267,
+    "pure_area_ha": 9543.25,
+    "total_sec": 62.56,
+    "total_min": 1.04,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 0.01,
+    "vram_res_peak_gb": 0.01,
+    "vram_alloc_avg_gb": 0.01,
+    "gpu_util_avg": 1.5,
+    "gpu_util_peak": 6.0,
+    "gpu_temp_max": 52,
+    "ram_peak_sys_gb": 51.06,
+    "ram_avg_sys_gb": 39.89,
+    "ram_peak_proc_gb": 49.85,
+    "cpu_util_avg": 6.2,
+    "cpu_util_peak": 23.5,
+    "sam_duration_sec": 1.41,
+    "vectorize_duration_sec": 7.73,
+    "s2_download_sec": 2.02,
+    "mapbiomas_sec": 2.25,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 49.06,
+      "2. Download Mosaico Sentinel-2 (GEE)": 2.02,
+      "3. Inferência SAMGeo (ViT-H GPU)": 1.41,
+      "4. Vetorização e Regularização Cadastral (CPU)": 7.73,
+      "5. Segmentação Pura no Perímetro CAR": 0.09,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 2.25,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5219258-B3304BD38B7B4F3E8E6B483AAE94AD04",
+    "municipio": "Santa Fe de Goias",
+    "car_area_ha": 1889.02,
+    "paddocks_count": 119,
+    "paddock_area_ha": 1772.74,
+    "pure_parcels_count": 121,
+    "pure_area_ha": 1777.85,
+    "total_sec": 276.77,
+    "total_min": 4.61,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.14,
+    "vram_alloc_avg_gb": 1.67,
+    "gpu_util_avg": 3.2,
+    "gpu_util_peak": 18.0,
+    "gpu_temp_max": 51,
+    "ram_peak_sys_gb": 5.52,
+    "ram_avg_sys_gb": 5.48,
+    "ram_peak_proc_gb": 4.48,
+    "cpu_util_avg": 1.5,
+    "cpu_util_peak": 2.8,
+    "sam_duration_sec": 225.16,
+    "vectorize_duration_sec": 2.96,
+    "s2_download_sec": 41.86,
+    "mapbiomas_sec": 3.84,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 2.87,
+      "2. Download Mosaico Sentinel-2 (GEE)": 41.86,
+      "3. Inferência SAMGeo (ViT-H GPU)": 225.16,
+      "4. Vetorização e Regularização Cadastral (CPU)": 2.96,
+      "5. Segmentação Pura no Perímetro CAR": 0.08,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 3.84,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5219902-041335F6BCD140FD9B29DEEFBD70DC13",
+    "municipio": "Sao Francisco de Goias",
+    "car_area_ha": 960.44,
+    "paddocks_count": 74,
+    "paddock_area_ha": 838.7,
+    "pure_parcels_count": 75,
+    "pure_area_ha": 841.24,
+    "total_sec": 381.78,
+    "total_min": 6.36,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.13,
+    "vram_alloc_avg_gb": 2.07,
+    "gpu_util_avg": 10.0,
+    "gpu_util_peak": 50.0,
+    "gpu_temp_max": 54,
+    "ram_peak_sys_gb": 5.58,
+    "ram_avg_sys_gb": 5.47,
+    "ram_peak_proc_gb": 4.48,
+    "cpu_util_avg": 2.1,
+    "cpu_util_peak": 3.4,
+    "sam_duration_sec": 350.3,
+    "vectorize_duration_sec": 1.48,
+    "s2_download_sec": 24.54,
+    "mapbiomas_sec": 3.65,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 1.72,
+      "2. Download Mosaico Sentinel-2 (GEE)": 24.54,
+      "3. Inferência SAMGeo (ViT-H GPU)": 350.3,
+      "4. Vetorização e Regularização Cadastral (CPU)": 1.48,
+      "5. Segmentação Pura no Perímetro CAR": 0.08,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 3.65,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "GO-5220504-AE59920E9ABB418D95CF98B459014C21",
+    "municipio": "Serranopolis",
+    "car_area_ha": 2114.08,
+    "paddocks_count": 96,
+    "paddock_area_ha": 2059.79,
+    "pure_parcels_count": 99,
+    "pure_area_ha": 2068.31,
+    "total_sec": 522.32,
+    "total_min": 8.71,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.13,
+    "vram_alloc_avg_gb": 2.21,
+    "gpu_util_avg": 11.6,
+    "gpu_util_peak": 58.0,
+    "gpu_temp_max": 53,
+    "ram_peak_sys_gb": 5.51,
+    "ram_avg_sys_gb": 5.46,
+    "ram_peak_proc_gb": 4.48,
+    "cpu_util_avg": 1.7,
+    "cpu_util_peak": 2.8,
+    "sam_duration_sec": 485.27,
+    "vectorize_duration_sec": 1.44,
+    "s2_download_sec": 31.09,
+    "mapbiomas_sec": 3.44,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 1.0,
+      "2. Download Mosaico Sentinel-2 (GEE)": 31.09,
+      "3. Inferência SAMGeo (ViT-H GPU)": 485.27,
+      "4. Vetorização e Regularização Cadastral (CPU)": 1.44,
+      "5. Segmentação Pura no Perímetro CAR": 0.08,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 3.44,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  },
+  {
+    "id": "MS-5006309-8DC93A48C2424FD7B3EDF235F8B531E1",
+    "municipio": "Paranaíba (MS)",
+    "car_area_ha": 1085.22,
+    "paddocks_count": 54,
+    "paddock_area_ha": 1020.14,
+    "pure_parcels_count": 55,
+    "pure_area_ha": 1022.1,
+    "total_sec": 219.35,
+    "total_min": 3.66,
+    "device": "NVIDIA GeForce RTX 2080 Ti",
+    "cpu_cores": 20,
+    "total_vram_gb": 11.0,
+    "vram_alloc_peak_gb": 6.47,
+    "vram_res_peak_gb": 9.14,
+    "vram_alloc_avg_gb": 1.62,
+    "gpu_util_avg": 40.2,
+    "gpu_util_peak": 96.0,
+    "gpu_temp_max": 70,
+    "ram_peak_sys_gb": 56.15,
+    "ram_avg_sys_gb": 43.54,
+    "ram_peak_proc_gb": 54.89,
+    "cpu_util_avg": 4.5,
+    "cpu_util_peak": 39.4,
+    "sam_duration_sec": 130.44,
+    "vectorize_duration_sec": 1.52,
+    "s2_download_sec": 29.37,
+    "mapbiomas_sec": 19.49,
+    "phases": {
+      "Inicialização": 0.0,
+      "1. Resolução da Área de Interesse (ROI)": 38.44,
+      "2. Download Mosaico Sentinel-2 (GEE)": 29.37,
+      "3. Inferência SAMGeo (ViT-H GPU)": 130.44,
+      "4. Vetorização e Regularização Cadastral (CPU)": 1.52,
+      "5. Segmentação Pura no Perímetro CAR": 0.08,
+      "6. Classificação Zonal MapBiomas (GEE/CPU)": 19.49,
+      "7. Exportação e Estatísticas Cadastrais": 0.0
+    }
+  }
+]
+    </script>
+
+    <!-- Lógica Interativa Javascript -->
+    <script>
+        // Carrega dados embutidos
+        const rawData = JSON.parse(document.getElementById('benchmark-data').textContent);
+        let activeData = [...rawData];
+        let isAreaLog = false;
+        let currentSort = { col: 'car_area_ha', asc: false };
+
+        // Cores temáticas
+        const theme = {
+            cyan: '#00f2fe',
+            purple: '#a855f7',
+            blue: '#3b82f6',
+            emerald: '#10b981',
+            rose: '#f43f5e',
+            amber: '#f59e0b',
+            magenta: '#ec4899',
+            cardBg: 'rgba(18, 24, 38, 0.85)',
+            gridColor: 'rgba(255, 255, 255, 0.06)',
+            textColor: '#94a3b8'
+        };
+
+        const layoutBase = {
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent',
+            font: { family: 'Plus Jakarta Sans', color: theme.textColor, size: 12 },
+            margin: { l: 55, r: 25, t: 30, b: 50 },
+            hovermode: 'closest',
+            xaxis: {
+                gridcolor: theme.gridColor,
+                zerolinecolor: theme.gridColor,
+                color: theme.textColor
+            },
+            yaxis: {
+                gridcolor: theme.gridColor,
+                zerolinecolor: theme.gridColor,
+                color: theme.textColor
+            }
+        };
+
+        let currentTab = 'vram';
+        let searchTimer = null;
+        let resizeTimer = null;
+
+        function initDashboard() {
+            renderActiveTabCharts();
+            renderTable();
+            lucide.createIcons();
+        }
+
+        function switchTab(tabId) {
+            currentTab = tabId;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.charts-container').forEach(c => c.classList.remove('active'));
+            
+            event.currentTarget.classList.add('active');
+            const target = document.getElementById('tab-' + tabId);
+            if (target) {
+                target.classList.add('active');
+                // Renderiza sob demanda apenas os gráficos da aba visível, evitando acúmulo de WebGL
+                setTimeout(() => {
+                    renderActiveTabCharts();
+                }, 40);
+            }
+        }
+
+        function applyPreset(preset) {
+            document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            document.getElementById('searchInput').value = '';
+
+            if (preset === 'all') {
+                activeData = [...rawData];
+            } else if (preset === 'large') {
+                activeData = rawData.filter(d => d.car_area_ha >= 2000);
+            } else if (preset === 'medium') {
+                activeData = rawData.filter(d => d.car_area_ha >= 500 && d.car_area_ha < 2000);
+            } else if (preset === 'small') {
+                activeData = rawData.filter(d => d.car_area_ha < 500);
+            } else if (preset === 'high_vram') {
+                activeData = rawData.filter(d => d.vram_alloc_peak_gb >= 8.0);
+            } else if (preset === 'ms') {
+                activeData = rawData.filter(d => d.municipio.includes('MS') || d.id.startsWith('MS'));
+            }
+
+            renderActiveTabCharts();
+            renderTable();
+        }
+
+        // Debounce para evitar renderizações a cada tecla digitada
+        function onSearchInput(e) {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                onSearchChange();
+            }, 180);
+        }
+
+        function onSearchChange() {
+            const q = document.getElementById('searchInput').value.toLowerCase().trim();
+            if (!q) {
+                activeData = [...rawData];
+            } else {
+                activeData = rawData.filter(d => 
+                    d.id.toLowerCase().includes(q) || 
+                    d.municipio.toLowerCase().includes(q)
+                );
+            }
+            renderActiveTabCharts();
+            renderTable();
+        }
+
+        function toggleAreaScale() {
+            isAreaLog = !isAreaLog;
+            const btn = document.getElementById('btnToggleLogScale');
+            btn.textContent = isAreaLog ? 'Escala Linear' : 'Escala Log';
+            btn.classList.toggle('active', isAreaLog);
+            renderChartVramArea();
+        }
+
+        /* ---------------- GRÁFICOS PLOTLY (Zero-Leak com Plotly.react) ---------------- */
+
+        function renderChartVramArea() {
+            const traceAlloc = {
+                x: activeData.map(d => d.car_area_ha),
+                y: activeData.map(d => d.vram_alloc_peak_gb),
+                mode: 'markers',
+                name: 'VRAM Alocada Real (GB)',
+                marker: {
+                    color: theme.cyan,
+                    size: 10,
+                    opacity: 0.85,
+                    line: { color: '#ffffff', width: 1 }
+                },
+                text: activeData.map(d => `<b>${d.municipio}</b><br>ID: ${d.id}<br>Área: ${d.car_area_ha.toLocaleString('pt-BR')} ha<br>VRAM Alocada: ${d.vram_alloc_peak_gb} GB`),
+                hoverinfo: 'text'
+            };
+
+            const traceRes = {
+                x: activeData.map(d => d.car_area_ha),
+                y: activeData.map(d => d.vram_res_peak_gb),
+                mode: 'markers',
+                name: 'VRAM Reservada (Cache) (GB)',
+                marker: {
+                    color: theme.purple,
+                    size: 10,
+                    symbol: 'diamond',
+                    opacity: 0.85,
+                    line: { color: '#ffffff', width: 1 }
+                },
+                text: activeData.map(d => `<b>${d.municipio}</b><br>ID: ${d.id}<br>Área: ${d.car_area_ha.toLocaleString('pt-BR')} ha<br>VRAM Reservada: ${d.vram_res_peak_gb} GB`),
+                hoverinfo: 'text'
+            };
+
+            const layout = JSON.parse(JSON.stringify(layoutBase));
+            layout.xaxis.title = isAreaLog ? 'Área do Imóvel no CAR (ha) - [Escala Logarítmica]' : 'Área do Imóvel no CAR (ha) - [Escala Linear]';
+            layout.xaxis.type = isAreaLog ? 'log' : 'linear';
+            layout.yaxis.title = 'Pico de VRAM da GPU (GB)';
+            layout.legend = { orientation: 'h', y: 1.15, x: 0.05 };
+
+            Plotly.react('chart-vram-area', [traceAlloc, traceRes], layout, { responsive: true, displayModeBar: false });
+        }
+
+        function renderChartVramViolin() {
+            const traceAlloc = {
+                type: 'violin',
+                y: activeData.map(d => d.vram_alloc_peak_gb),
+                name: 'VRAM Alocada Real',
+                box: { visible: true },
+                meanline: { visible: true },
+                line: { color: theme.cyan },
+                fillcolor: 'rgba(0, 242, 254, 0.25)',
+                points: 'all',
+                jitter: 0.35,
+                pointpos: -0.5,
+                marker: { size: 6, color: theme.cyan }
+            };
+
+            const traceRes = {
+                type: 'violin',
+                y: activeData.map(d => d.vram_res_peak_gb),
+                name: 'VRAM Reservada (Cache)',
+                box: { visible: true },
+                meanline: { visible: true },
+                line: { color: theme.purple },
+                fillcolor: 'rgba(168, 85, 247, 0.25)',
+                points: 'all',
+                jitter: 0.35,
+                pointpos: 0.5,
+                marker: { size: 6, color: theme.purple }
+            };
+
+            const layout = JSON.parse(JSON.stringify(layoutBase));
+            layout.yaxis.title = 'VRAM Registrada (GB)';
+            layout.legend = { orientation: 'h', y: 1.12, x: 0.1 };
+
+            Plotly.react('chart-vram-violin', [traceAlloc, traceRes], layout, { responsive: true, displayModeBar: false });
+        }
+
+        function renderChartCacheOverhead() {
+            const sortedByDiff = [...activeData].sort((a, b) => (b.vram_res_peak_gb - b.vram_alloc_peak_gb) - (a.vram_res_peak_gb - a.vram_alloc_peak_gb));
+            
+            const trace = {
+                x: sortedByDiff.map(d => `${d.municipio} (${d.id.substring(0, 10)}...)`),
+                y: sortedByDiff.map(d => +(d.vram_res_peak_gb - d.vram_alloc_peak_gb).toFixed(2)),
+                type: 'bar',
+                marker: {
+                    color: sortedByDiff.map(d => {
+                        const diff = d.vram_res_peak_gb - d.vram_alloc_peak_gb;
+                        if (diff > 10) return theme.rose;
+                        if (diff > 3) return theme.purple;
+                        return theme.emerald;
+                    })
+                },
+                text: sortedByDiff.map(d => `${+(d.vram_res_peak_gb - d.vram_alloc_peak_gb).toFixed(1)} GB`),
+                textposition: 'auto',
+                hoverinfo: 'text'
+            };
+
+            const layout = JSON.parse(JSON.stringify(layoutBase));
+            layout.yaxis.title = 'Memória Ociosa em Cache (Reservada - Alocada) [GB]';
+            layout.xaxis.tickangle = -35;
+            layout.margin.b = 100;
+
+            Plotly.react('chart-cache-overhead', [trace], layout, { responsive: true, displayModeBar: false });
+        }
+
+        function renderChartThermalViolin() {
+            const traceTemp = {
+                type: 'violin',
+                y: activeData.map(d => d.gpu_temp_max),
+                name: 'Temperatura GPU (°C)',
+                box: { visible: true },
+                meanline: { visible: true },
+                line: { color: theme.rose },
+                fillcolor: 'rgba(244, 63, 94, 0.25)',
+                points: 'all',
+                jitter: 0.35,
+                marker: { size: 7, color: theme.rose }
+            };
+
+            const traceCompute = {
+                type: 'violin',
+                y: activeData.map(d => d.gpu_util_avg),
+                name: 'Carga Média GPU (%)',
+                box: { visible: true },
+                meanline: { visible: true },
+                line: { color: theme.amber },
+                fillcolor: 'rgba(245, 158, 11, 0.25)',
+                points: 'all',
+                jitter: 0.35,
+                marker: { size: 7, color: theme.amber }
+            };
+
+            const layout = JSON.parse(JSON.stringify(layoutBase));
+            layout.yaxis.title = 'Valor Medido (°C ou %)';
+            layout.legend = { orientation: 'h', y: 1.12, x: 0.1 };
+
+            Plotly.react('chart-thermal-violin', [traceTemp, traceCompute], layout, { responsive: true, displayModeBar: false });
+        }
+
+        function renderChartTempTime() {
+            const trace = {
+                x: activeData.map(d => d.total_min),
+                y: activeData.map(d => d.gpu_temp_max),
+                mode: 'markers',
+                marker: {
+                    size: 12,
+                    color: activeData.map(d => d.gpu_temp_max),
+                    colorscale: [
+                        [0.0, theme.cyan],
+                        [0.5, theme.amber],
+                        [1.0, theme.rose]
+                    ],
+                    colorbar: { title: 'Temp (°C)', len: 0.8 },
+                    line: { color: '#ffffff', width: 1 }
+                },
+                text: activeData.map(d => `<b>${d.municipio}</b><br>ID: ${d.id}<br>Duração: ${d.total_min} min (${d.total_sec}s)<br>Temp Máx: ${d.gpu_temp_max} °C<br>Área: ${d.car_area_ha} ha`),
+                hoverinfo: 'text'
+            };
+
+            const layout = JSON.parse(JSON.stringify(layoutBase));
+            layout.xaxis.title = 'Duração Total de Processamento (minutos)';
+            layout.yaxis.title = 'Temperatura Máxima Registrada da GPU (°C)';
+
+            Plotly.react('chart-temp-time', [trace], layout, { responsive: true, displayModeBar: false });
+        }
+
+        function renderChartBubbleEfficiency() {
+            const trace = {
+                x: activeData.map(d => d.car_area_ha),
+                y: activeData.map(d => d.total_min),
+                mode: 'markers',
+                marker: {
+                    size: activeData.map(d => Math.max(10, Math.min(45, d.paddocks_count * 0.25))),
+                    color: activeData.map(d => d.vram_alloc_peak_gb),
+                    colorscale: 'Viridis',
+                    colorbar: { title: 'VRAM Aloc. (GB)' },
+                    opacity: 0.85,
+                    line: { color: '#ffffff', width: 1 }
+                },
+                text: activeData.map(d => `<b>${d.municipio}</b><br>Área: ${d.car_area_ha.toLocaleString('pt-BR')} ha<br>Piquetes: ${d.paddocks_count}<br>Tempo: ${d.total_min} min (${d.total_sec}s)<br>Pico VRAM: ${d.vram_alloc_peak_gb} GB`),
+                hoverinfo: 'text'
+            };
+
+            const layout = JSON.parse(JSON.stringify(layoutBase));
+            layout.xaxis.title = 'Área do Imóvel CAR (ha)';
+            layout.yaxis.title = 'Tempo Total (minutos)';
+
+            Plotly.react('chart-bubble-efficiency', [trace], layout, { responsive: true, displayModeBar: false });
+        }
+
+        function renderChartPaddocksArea() {
+            const trace = {
+                x: activeData.map(d => d.car_area_ha),
+                y: activeData.map(d => d.paddocks_count),
+                mode: 'markers',
+                marker: {
+                    size: 10,
+                    color: theme.emerald,
+                    opacity: 0.85,
+                    line: { color: '#ffffff', width: 1 }
+                },
+                text: activeData.map(d => `<b>${d.municipio}</b><br>Área: ${d.car_area_ha.toLocaleString('pt-BR')} ha<br>Piquetes: ${d.paddocks_count}`),
+                hoverinfo: 'text'
+            };
+
+            const layout = JSON.parse(JSON.stringify(layoutBase));
+            layout.xaxis.title = 'Área do Imóvel CAR (ha)';
+            layout.yaxis.title = 'Total de Piquetes Delimitados';
+
+            Plotly.react('chart-paddocks-area', [trace], layout, { responsive: true, displayModeBar: false });
+        }
+
+        function renderChartPhasesBreakdown() {
+            const categories = [
+                { key: 'sam_duration_sec', name: 'Inferência SAMGeo (ViT-H GPU)', color: theme.cyan },
+                { key: 'vectorize_duration_sec', name: 'Vetorização Planar (CPU)', color: theme.emerald },
+                { key: 's2_download_sec', name: 'Download Sentinel-2 (GEE)', color: theme.blue },
+                { key: 'mapbiomas_sec', name: 'Classificação MapBiomas (GEE)', color: theme.purple }
+            ];
+
+            const sortedProps = [...activeData].sort((a, b) => b.total_sec - a.total_sec);
+            const traces = categories.map(cat => ({
+                x: sortedProps.map(d => `${d.municipio} (${d.id.substring(0, 10)}...)`),
+                y: sortedProps.map(d => d[cat.key]),
+                name: cat.name,
+                type: 'bar',
+                marker: { color: cat.color }
+            }));
+
+            const layout = JSON.parse(JSON.stringify(layoutBase));
+            layout.barmode = 'stack';
+            layout.yaxis.title = 'Duração Acumulada da Etapa (segundos)';
+            layout.xaxis.tickangle = -35;
+            layout.legend = { orientation: 'h', y: 1.15, x: 0.05 };
+            layout.margin.b = 100;
+
+            Plotly.react('chart-phases-breakdown', traces, layout, { responsive: true, displayModeBar: false });
+        }
+
+        // Renderiza apenas os gráficos da aba ativa (Lazy-Rendering)
+        function renderActiveTabCharts() {
+            if (currentTab === 'vram') {
+                renderChartVramArea();
+                renderChartVramViolin();
+                renderChartCacheOverhead();
+            } else if (currentTab === 'thermal') {
+                renderChartThermalViolin();
+                renderChartTempTime();
+            } else if (currentTab === 'efficiency') {
+                renderChartBubbleEfficiency();
+                renderChartPaddocksArea();
+                renderChartPhasesBreakdown();
+            }
+        }
+
+        /* ---------------- TABELA AUDITÁVEL ---------------- */
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            const sorted = [...activeData].sort((a, b) => {
+                let valA = a[currentSort.col];
+                let valB = b[currentSort.col];
+                if (typeof valA === 'string') {
+                    return currentSort.asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                }
+                return currentSort.asc ? valA - valB : valB - valA;
+            });
+
+            sorted.forEach(d => {
+                const tr = document.createElement('tr');
+                
+                // Tags coloridas
+                const tempTag = d.gpu_temp_max > 65 ? 'danger' : (d.gpu_temp_max > 55 ? 'warning' : 'normal');
+                const vramTag = d.vram_res_peak_gb > 15 ? 'danger' : (d.vram_res_peak_gb > 10 ? 'purple' : 'normal');
+                
+                tr.innerHTML = `
+                    <td><a href="#" class="id-link" title="${d.id}">${d.id}</a></td>
+                    <td><strong>${d.municipio}</strong></td>
+                    <td style="font-family: var(--font-mono);">${d.car_area_ha.toLocaleString('pt-BR')} ha</td>
+                    <td style="font-family: var(--font-mono); font-weight: 600;">${d.paddocks_count}</td>
+                    <td style="font-family: var(--font-mono);">${d.total_min} min <span style="color: var(--text-muted); font-size: 0.75rem;">(${d.total_sec}s)</span></td>
+                    <td style="font-family: var(--font-mono);">${d.vram_alloc_peak_gb.toFixed(2)} GB</td>
+                    <td><span class="tag ${vramTag}">${d.vram_res_peak_gb.toFixed(2)} GB</span></td>
+                    <td><span class="tag ${tempTag}">${d.gpu_temp_max} °C</span></td>
+                    <td style="font-family: var(--font-mono);">${d.gpu_util_avg}%</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function sortTable(col) {
+            if (currentSort.col === col) {
+                currentSort.asc = !currentSort.asc;
+            } else {
+                currentSort.col = col;
+                currentSort.asc = false;
+            }
+            renderTable();
+        }
+
+        function exportCSV() {
+            const headers = ['id', 'municipio', 'car_area_ha', 'paddocks_count', 'total_sec', 'total_min', 'vram_alloc_peak_gb', 'vram_res_peak_gb', 'gpu_temp_max', 'gpu_util_avg'];
+            let csv = headers.join(';') + '\n';
+            activeData.forEach(d => {
+                csv += headers.map(h => d[h]).join(';') + '\n';
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'relatorio_benchmark_lapig.csv';
+            link.click();
+        }
+
+        // Inicializa ao carregar a página
+        window.addEventListener('DOMContentLoaded', initDashboard);
+    </script>
+</body>
+</html>
