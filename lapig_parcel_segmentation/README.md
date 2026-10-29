@@ -1,7 +1,7 @@
 # ⚙️ ParcelAnything: Auto Mode (Vetorização Cadastral Automatizada em Lote)
 
 **Laboratório de Processamento de Imagens e Geoprocessamento (LAPIG / UFG)**  
-*Pipeline modular para extração automatizada de piquetes rurais com cercas retilíneas (mourão a mourão), segmentação cadastral pura, classificação temática de pastagem via MapBiomas (até 2025), recorte pelo CAR e benchmark automático de hardware.*
+*Pipeline modular para extração automatizada de parcelas rurais com cercas retilíneas (mourão a mourão), segmentação cadastral pura, classificação temática via MapBiomas (até 2025), recorte pelo CAR e benchmark automático de hardware.*
 
 ---
 
@@ -48,13 +48,13 @@ Este pacote substitui e modulariza os procedimentos do notebook `parcelSegmentat
                                            │
         ┌──────────────────────────────────┴──────────────────────────────────┐
         ▼                                                                     ▼
-[CAMADA 1: SEGMENTAÇÃO PURA]                                         [CAMADA 2: FILTRO PASTAGEM]
-Todos os talhões físicos no CAR                                      Apenas talhões de pastagem
-com colunas de auditoria:                                            validados por dominância zonal:
+[CAMADA 1: SEGMENTAÇÃO PURA]                                         [CAMADA 2: FILTRO TEMÁTICO]
+Todas as parcelas físicas no CAR                                     Apenas parcelas produtivas
+com colunas de auditoria:                                            validadas por dominância zonal:
 (pasto_cov, ndvi_med, is_pasto, classe)                              (MapBiomas 10m Col 4 / 30m Col 11)
         │                                                                     │
         ▼                                                                     ▼
-Shapefile: piquetes_segmentacao_pura_{ID}.shp      Shapefile: piquetes_finais_cercas_retas_{ID}.shp
+Shapefile: parcelas_segmentacao_pura_{ID}.shp      Shapefile: parcelas_finais_cercas_retas_{ID}.shp
 ```
 
 ---
@@ -103,8 +103,8 @@ Para resolver essa limitação, o pipeline gera **duas camadas vetoriais complem
 
 | Camada | Arquivo Gerado | Descrição e Aplicação |
 | :--- | :--- | :--- |
-| **Segmentação Pura** | `piquetes_segmentacao_pura_{ID}.shp` | **Todos os piquetes e talhões físicos** delimitados pelas cercas e divisas reais da fazenda dentro do CAR, sem nenhum descarte temático. Inclui colunas de auditoria: `pasto_cov`, `ndvi_med`, `is_pasto` (1 ou 0) e `classe` ('Pastagem' ou 'Não Pastagem'). Ideal para planejamento agronômico e gestão de pastoreio rotacionado. |
-| **Piquetes de Pasto** | `piquetes_finais_cercas_retas_{ID}.shp` | Subconjunto validado pela dominância zonal do MapBiomas (`pasto_cov >= 0.35`). |
+| **Segmentação Pura** | `parcelas_segmentacao_pura_{ID}.shp` | **Todas as parcelas e talhões físicos** delimitados pelas cercas e divisas reais da fazenda dentro do CAR, sem nenhum descarte temático. Inclui colunas de auditoria: `pasto_cov`, `ndvi_med`, `is_pasto` (1 ou 0) e `classe` ('Pastagem' ou 'Não Pastagem'). Ideal para planejamento agronômico e gestão de pastoreio rotacionado. |
+| **Parcelas Produtivas** | `parcelas_finais_cercas_retas_{ID}.shp` | Subconjunto validado pela dominância zonal do MapBiomas (`pasto_cov >= 0.35`). |
 | **Auditoria Não-Pasto** | `nao_pastagem_auditoria.shp` | Polígonos de matas ciliares, APPs, reservas legais e infraestruturas excluídos do filtro de pastagem. |
 
 ---
@@ -121,8 +121,8 @@ results/{ID_DO_IMOVEL}/
 * `s2_ndvi_rgb.tif`: Mosaico multi-temporal Sentinel-2 (NDVI max, median, min).
 * `masks.tif`: Raster com as máscaras segmentadas pelo SAMGeo.
 * `temp_mb_mask_10m.tif`: Máscara binária da Classe 15 do MapBiomas exportada do GEE.
-* `piquetes_segmentacao_pura_{ID}.shp`: **Segmentação pura de todos os talhões no CAR.**
-* `piquetes_finais_cercas_retas_{ID}.shp`: **Shapefile oficial dos piquetes de pastagem.**
+* `parcelas_segmentacao_pura_{ID}.shp`: **Segmentação pura de todas as parcelas no CAR.**
+* `parcelas_finais_cercas_retas_{ID}.shp`: **Shapefile oficial das parcelas validadas.**
 * `nao_pastagem_auditoria.shp`: Áreas de vegetação nativa e não-pastagem para auditoria.
 * `relatorio_benchmark_hardware.txt`: Relatório técnico de desempenho e uso de componentes.
 * `relatorio_benchmark_hardware.json`: Dados brutos do benchmark de hardware.
@@ -160,8 +160,8 @@ gdf_pasto, shp_pasto, gdf_puro, shp_puro = run_analysis_lapig(
     enable_benchmark=True      # Ativa monitoramento de hardware
 )
 
-print(f"Piquetes de Pastagem: {shp_pasto} ({len(gdf_pasto)} piquetes)")
-print(f"Segmentação Pura:     {shp_puro} ({len(gdf_puro)} talhões)")
+print(f"Parcelas Validadas: {shp_pasto} ({len(gdf_pasto)} parcelas)")
+print(f"Segmentação Pura:   {shp_puro} ({len(gdf_puro)} parcelas)")
 ```
 
 ### Exemplo 2: Visualizar Relatório de Benchmark no Notebook
@@ -209,8 +209,8 @@ gdfs_sucesso, shp_consolidado = run_batch_analysis_lapig(
 )
 
 # Shapefiles gerados na raiz:
-# - results/piquetes_todos_imoveis_consolidados.shp (Pastagem)
-# - results/piquetes_todos_imoveis_segmentacao_pura.shp (Segmentação Pura)
+# - results/parcelas_todos_imoveis_consolidados.shp (Parcelas Validadas)
+# - results/parcelas_todos_imoveis_segmentacao_pura.shp (Segmentação Pura)
 # - results/relatorio_benchmark_hardware_lote.txt (Benchmark do Lote)
 ```
 
@@ -231,7 +231,7 @@ gdfs_sucesso, shp_consolidado = run_batch_analysis_lapig(
 | `buffer_size` | `int` | `500` | Buffer em metros ao redor do imóvel para evitar cortes de borda. |
 | `min_area_ha` | `float` | `2.0` | Área mínima em hectares. Polígonos menores são dissolvidos no vizinho. |
 | `straight_tol` | `float` | `22.0` | Tolerância Hausdorff (m) para considerar uma divisa como cerca reta. |
-| `min_pasture_coverage` | `float` | `0.35` | Fração mínima de pixels de pasto (0 a 1) para validar o piquete. |
+| `min_pasture_coverage` | `float` | `0.35` | Fração mínima de pixels de pasto (0 a 1) para validar a parcela. |
 | `mapbiomas_collection` | `str` | `'10m'` | Coleção do MapBiomas: `'10m'` (Col 4) ou `'30m'` (Col 11). |
 | `skip_sam_if_exists` | `bool` | `True` | Pula a inferência do SAMGeo se `masks.tif` já existir na pasta. |
 | `return_pure` | `bool` | `False` | Se `True`, retorna tupla com `(gdf_pasto, shp_pasto, gdf_puro, shp_puro)`. |

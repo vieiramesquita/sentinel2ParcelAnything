@@ -116,8 +116,8 @@ def collect_benchmark_dataset(results_dir="results", gpkg_path="car_goias_area_i
             continue
 
         # Inspecionar shapefiles para obter contagens reais
-        pasto_shps = glob.glob(os.path.join(folder_path, "piquetes_finais_cercas_retas_*.shp"))
-        puro_shps = glob.glob(os.path.join(folder_path, "piquetes_segmentacao_pura_*.shp"))
+        pasto_shps = glob.glob(os.path.join(folder_path, "parcelas_finais_cercas_retas_*.shp")) or glob.glob(os.path.join(folder_path, "piquetes_finais_cercas_retas_*.shp"))
+        puro_shps = glob.glob(os.path.join(folder_path, "parcelas_segmentacao_pura_*.shp")) or glob.glob(os.path.join(folder_path, "piquetes_segmentacao_pura_*.shp"))
 
         num_paddock = 0
         area_paddock = 0.0
@@ -700,7 +700,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
 
         <div class="kpi-card" style="--card-accent: var(--neon-blue);">
             <div class="kpi-title">
-                <span>Piquetes Cadastrais</span>
+                <span>Parcelas Cadastrais</span>
                 <i data-lucide="grid" style="width: 16px; height: 16px; color: var(--neon-blue);"></i>
             </div>
             <div class="kpi-value">{total_paddocks:,}</div>
@@ -851,21 +851,21 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
                     <div>
                         <div class="chart-title">
                             <i data-lucide="target" style="color: var(--neon-blue);"></i>
-                            Matriz de Eficiência: Tempo vs. Área vs. Piquetes
+                            Matriz de Eficiência: Tempo vs. Área vs. Parcelas
                         </div>
-                        <div class="chart-desc">Tamanho da bolha = Quantidade de Piquetes | Cor = Pico de VRAM Alocada</div>
+                        <div class="chart-desc">Tamanho da bolha = Quantidade de Parcelas | Cor = Pico de VRAM Alocada</div>
                     </div>
                 </div>
                 <div id="chart-bubble-efficiency" class="chart-plot"></div>
             </div>
 
-            <!-- Chart 3B: Piquetes vs Área -->
+            <!-- Chart 3B: Parcelas vs Área -->
             <div class="chart-box">
                 <div class="chart-header">
                     <div>
                         <div class="chart-title">
                             <i data-lucide="layers" style="color: var(--neon-emerald);"></i>
-                            Densidade Cadastral: Piquetes vs. Área (ha)
+                            Densidade Cadastral: Parcelas vs. Área (ha)
                         </div>
                         <div class="chart-desc">Intensidade de divisão de pastagem por dimensão fundiária</div>
                     </div>
@@ -904,7 +904,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
                         <th onclick="sortTable('id')">Código do Imóvel</th>
                         <th onclick="sortTable('municipio')">Município</th>
                         <th onclick="sortTable('car_area_ha')">Área CAR (ha)</th>
-                        <th onclick="sortTable('paddocks_count')">Piquetes</th>
+                        <th onclick="sortTable('paddocks_count')">Parcelas</th>
                         <th onclick="sortTable('total_min')">Duração</th>
                         <th onclick="sortTable('vram_alloc_peak_gb')">VRAM Aloc.</th>
                         <th onclick="sortTable('vram_res_peak_gb')">VRAM Res. (Cache)</th>
@@ -1226,7 +1226,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
                     opacity: 0.85,
                     line: {{ color: '#ffffff', width: 1 }}
                 }},
-                text: activeData.map(d => `<b>${{d.municipio}}</b><br>Área: ${{d.car_area_ha.toLocaleString('pt-BR')}} ha<br>Piquetes: ${{d.paddocks_count}}<br>Tempo: ${{d.total_min}} min (${{d.total_sec}}s)<br>Pico VRAM: ${{d.vram_alloc_peak_gb}} GB`),
+                text: activeData.map(d => `<b>${{d.municipio}}</b><br>Área: ${{d.car_area_ha.toLocaleString('pt-BR')}} ha<br>Parcelas: ${{d.paddocks_count}}<br>Tempo: ${{d.total_min}} min (${{d.total_sec}}s)<br>Pico VRAM: ${{d.vram_alloc_peak_gb}} GB`),
                 hoverinfo: 'text'
             }};
 
@@ -1248,13 +1248,13 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
                     opacity: 0.85,
                     line: {{ color: '#ffffff', width: 1 }}
                 }},
-                text: activeData.map(d => `<b>${{d.municipio}}</b><br>Área: ${{d.car_area_ha.toLocaleString('pt-BR')}} ha<br>Piquetes: ${{d.paddocks_count}}`),
+                text: activeData.map(d => `<b>${{d.municipio}}</b><br>Área: ${{d.car_area_ha.toLocaleString('pt-BR')}} ha<br>Parcelas: ${{d.paddocks_count}}`),
                 hoverinfo: 'text'
             }};
 
             const layout = JSON.parse(JSON.stringify(layoutBase));
             layout.xaxis.title = 'Área do Imóvel CAR (ha)';
-            layout.yaxis.title = 'Total de Piquetes Delimitados';
+            layout.yaxis.title = 'Total de Parcelas Delimitadas';
 
             Plotly.react('chart-paddocks-area', [trace], layout, {{ responsive: true, displayModeBar: false }});
         }}

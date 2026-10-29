@@ -41,7 +41,7 @@ def get_gpu_info():
 
 def run_samgeo_segmentation(image_path, output_mask_path, model_type='auto', checkpoint_dir='models', force_rerun=False):
     """
-    Executa a segmentação de piquetes com o Segment Anything Model for Geospatial (SAMGeo).
+    Executa a segmentação de parcelas com o Segment Anything Model for Geospatial (SAMGeo).
     
     Gerenciamento automático de hardware:
     - RTX 2080 Ti (11GB): Roda ViT-H ou ViT-L com folga.

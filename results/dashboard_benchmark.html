@@ -486,7 +486,7 @@
 
         <div class="kpi-card" style="--card-accent: var(--neon-blue);">
             <div class="kpi-title">
-                <span>Piquetes Cadastrais</span>
+                <span>Parcelas Cadastrais</span>
                 <i data-lucide="grid" style="width: 16px; height: 16px; color: var(--neon-blue);"></i>
             </div>
             <div class="kpi-value">1,861</div>
@@ -637,21 +637,21 @@
                     <div>
                         <div class="chart-title">
                             <i data-lucide="target" style="color: var(--neon-blue);"></i>
-                            Matriz de Eficiência: Tempo vs. Área vs. Piquetes
+                            Matriz de Eficiência: Tempo vs. Área vs. Parcelas
                         </div>
-                        <div class="chart-desc">Tamanho da bolha = Quantidade de Piquetes | Cor = Pico de VRAM Alocada</div>
+                        <div class="chart-desc">Tamanho da bolha = Quantidade de Parcelas | Cor = Pico de VRAM Alocada</div>
                     </div>
                 </div>
                 <div id="chart-bubble-efficiency" class="chart-plot"></div>
             </div>
 
-            <!-- Chart 3B: Piquetes vs Área -->
+            <!-- Chart 3B: Parcelas vs Área -->
             <div class="chart-box">
                 <div class="chart-header">
                     <div>
                         <div class="chart-title">
                             <i data-lucide="layers" style="color: var(--neon-emerald);"></i>
-                            Densidade Cadastral: Piquetes vs. Área (ha)
+                            Densidade Cadastral: Parcelas vs. Área (ha)
                         </div>
                         <div class="chart-desc">Intensidade de divisão de pastagem por dimensão fundiária</div>
                     </div>
@@ -690,7 +690,7 @@
                         <th onclick="sortTable('id')">Código do Imóvel</th>
                         <th onclick="sortTable('municipio')">Município</th>
                         <th onclick="sortTable('car_area_ha')">Área CAR (ha)</th>
-                        <th onclick="sortTable('paddocks_count')">Piquetes</th>
+                        <th onclick="sortTable('paddocks_count')">Parcelas</th>
                         <th onclick="sortTable('total_min')">Duração</th>
                         <th onclick="sortTable('vram_alloc_peak_gb')">VRAM Aloc.</th>
                         <th onclick="sortTable('vram_res_peak_gb')">VRAM Res. (Cache)</th>
@@ -1832,7 +1832,7 @@
                     opacity: 0.85,
                     line: { color: '#ffffff', width: 1 }
                 },
-                text: activeData.map(d => `<b>${d.municipio}</b><br>Área: ${d.car_area_ha.toLocaleString('pt-BR')} ha<br>Piquetes: ${d.paddocks_count}<br>Tempo: ${d.total_min} min (${d.total_sec}s)<br>Pico VRAM: ${d.vram_alloc_peak_gb} GB`),
+                text: activeData.map(d => `<b>${d.municipio}</b><br>Área: ${d.car_area_ha.toLocaleString('pt-BR')} ha<br>Parcelas: ${d.paddocks_count}<br>Tempo: ${d.total_min} min (${d.total_sec}s)<br>Pico VRAM: ${d.vram_alloc_peak_gb} GB`),
                 hoverinfo: 'text'
             };
 
@@ -1854,13 +1854,13 @@
                     opacity: 0.85,
                     line: { color: '#ffffff', width: 1 }
                 },
-                text: activeData.map(d => `<b>${d.municipio}</b><br>Área: ${d.car_area_ha.toLocaleString('pt-BR')} ha<br>Piquetes: ${d.paddocks_count}`),
+                text: activeData.map(d => `<b>${d.municipio}</b><br>Área: ${d.car_area_ha.toLocaleString('pt-BR')} ha<br>Parcelas: ${d.paddocks_count}`),
                 hoverinfo: 'text'
             };
 
             const layout = JSON.parse(JSON.stringify(layoutBase));
             layout.xaxis.title = 'Área do Imóvel CAR (ha)';
-            layout.yaxis.title = 'Total de Piquetes Delimitados';
+            layout.yaxis.title = 'Total de Parcelas Delimitadas';
 
             Plotly.react('chart-paddocks-area', [trace], layout, { responsive: true, displayModeBar: false });
         }

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Pipeline Modular de Segmentação e Vetorização Cadastral de Piquetes (LAPIG)
+Pipeline Modular de Segmentação e Vetorização Cadastral de Parcelas (LAPIG)
 Substituição definitiva e modularizada do notebook parcelSegmentation_SAMGeo_LAPIG.ipynb
 
 Suporta execução individual e processamento em lote (Batch Processing para todos os IDs de um arquivo).
@@ -80,7 +80,7 @@ def run_analysis_lapig(
     Executa a análise para um imóvel ou delega para lote caso id_value='all'.
     
     Novidades:
-    1. Segmentação Pura: Gera 'piquetes_segmentacao_pura_{ID}.shp' contendo todos os talhões
+    1. Segmentação Pura: Gera 'parcelas_segmentacao_pura_{ID}.shp' contendo todos os talhões
        físicos no CAR antes de qualquer descarte pelo MapBiomas.
     2. Benchmark de Hardware: Monitora em segundo plano VRAM (pico/média), RAM do sistema,
        uso de CPU e GPU compute durante todas as etapas e gera relatório técnico.
@@ -199,7 +199,7 @@ def run_analysis_lapig(
         min_area_ha=min_area_ha * 0.5
     )
     gdf_pure_car['cod_car'] = clean_id
-    pure_shp_path = os.path.join(folder_name, f"piquetes_segmentacao_pura_{clean_id}.shp")
+    pure_shp_path = os.path.join(folder_name, f"parcelas_segmentacao_pura_{clean_id}.shp")
 
     # 6. Classificação Zonal e Filtragem Temática de Pastagem (MapBiomas)
     if monitor:
@@ -234,19 +234,19 @@ def run_analysis_lapig(
                 'class_name': 'classe'
             })
             gdf_pure_clean['is_pasto'] = gdf_pure_clean['is_pasto'].astype(int)
-            if 'id_piquete' not in gdf_pure_clean.columns:
-                gdf_pure_clean['id_piquete'] = range(1, len(gdf_pure_clean) + 1)
+            if 'id_parcela' not in gdf_pure_clean.columns:
+                gdf_pure_clean['id_parcela'] = range(1, len(gdf_pure_clean) + 1)
 
             gdf_pure_clean_4326 = gdf_pure_clean.to_crs(epsg=4326)
             gdf_pure_clean_4326.to_file(pure_shp_path)
             print(f"📦 Shapefile de Segmentação Pura Salvo (Todos os {len(gdf_pure_clean_4326)} talhões): {pure_shp_path}")
 
-            # Camada 2: Apenas Piquetes de Pastagem
+            # Camada 2: Apenas Parcelas de Pastagem
             gdf_pasture = gdf_pure_clean_4326[gdf_pure_clean_4326['is_pasto'] == 1].copy().reset_index(drop=True)
-            gdf_pasture['id_piquete'] = range(1, len(gdf_pasture) + 1)
-            final_shp_path = os.path.join(folder_name, f"piquetes_finais_cercas_retas_{clean_id}.shp")
+            gdf_pasture['id_parcela'] = range(1, len(gdf_pasture) + 1)
+            final_shp_path = os.path.join(folder_name, f"parcelas_finais_cercas_retas_{clean_id}.shp")
             gdf_pasture.to_file(final_shp_path)
-            print(f"💾 Shapefile Final de Pastagem Salvo ({len(gdf_pasture)} piquetes): {final_shp_path}")
+            print(f"💾 Shapefile Final de Pastagem Salvo ({len(gdf_pasture)} parcelas): {final_shp_path}")
 
             # Camada 3: Não-Pastagem (Auditoria de áreas excluídas: mata, lavoura, etc.)
             gdf_others_clean = gdf_pure_clean_4326[gdf_pure_clean_4326['is_pasto'] == 0].copy().reset_index(drop=True)
@@ -260,16 +260,16 @@ def run_analysis_lapig(
         except Exception as e:
             print(f"⚠️ Aviso na consulta ao MapBiomas: {e}. Mantendo segmentação pura.")
             gdf_pure_clean_4326 = gdf_pure_car.to_crs(epsg=4326)
-            if 'id_piquete' not in gdf_pure_clean_4326.columns:
-                gdf_pure_clean_4326['id_piquete'] = range(1, len(gdf_pure_clean_4326) + 1)
+            if 'id_parcela' not in gdf_pure_clean_4326.columns:
+                gdf_pure_clean_4326['id_parcela'] = range(1, len(gdf_pure_clean_4326) + 1)
             gdf_pure_clean_4326.to_file(pure_shp_path)
             gdf_final_clean_4326 = gdf_pure_clean_4326
             final_shp_path = pure_shp_path
     else:
         # Sem filtro de pastagem: o resultado final é a própria segmentação pura
         gdf_pure_clean_4326 = gdf_pure_car.to_crs(epsg=4326)
-        if 'id_piquete' not in gdf_pure_clean_4326.columns:
-            gdf_pure_clean_4326['id_piquete'] = range(1, len(gdf_pure_clean_4326) + 1)
+        if 'id_parcela' not in gdf_pure_clean_4326.columns:
+            gdf_pure_clean_4326['id_parcela'] = range(1, len(gdf_pure_clean_4326) + 1)
         gdf_pure_clean_4326.to_file(pure_shp_path)
         gdf_final_clean_4326 = gdf_pure_clean_4326
         final_shp_path = pure_shp_path
@@ -332,8 +332,8 @@ def run_batch_analysis_lapig(
     """
     Executa o pipeline em lote (batch) para TODOS os imóveis presentes no arquivo vetorial.
     Gera as pastas individuais de cada imóvel e compila shapefiles consolidados:
-    - piquetes_todos_imoveis_consolidados.shp (pastagem filtrada)
-    - piquetes_todos_imoveis_segmentacao_pura.shp (segmentação física pura de todos os talhões)
+    - parcelas_todos_imoveis_consolidados.shp (pastagem filtrada)
+    - parcelas_todos_imoveis_segmentacao_pura.shp (segmentação física pura de todos os talhões)
     - relatorio_benchmark_hardware_lote.txt (monitoramento global de hardware)
     - Liberação contínua de VRAM garantida a cada imóvel processado.
     """
@@ -434,7 +434,7 @@ def run_batch_analysis_lapig(
             try:
                 gdf_consolidated_pasto = pd.concat(success_gdfs_pasture, ignore_index=True)
                 gdf_consolidated_pasto = gpd.GeoDataFrame(gdf_consolidated_pasto, geometry='geometry', crs=success_gdfs_pasture[0].crs)
-                consolidated_pasture_path = os.path.join(output_base_dir, "piquetes_todos_imoveis_consolidados.shp")
+                consolidated_pasture_path = os.path.join(output_base_dir, "parcelas_todos_imoveis_consolidados.shp")
                 gdf_consolidated_pasto.to_file(consolidated_pasture_path)
                 print(f"\n📦 Shapefile Consolidado de Pastagem Salvo: {consolidated_pasture_path}")
             except Exception as e:
@@ -445,7 +445,7 @@ def run_batch_analysis_lapig(
             try:
                 gdf_consolidated_pure = pd.concat(success_gdfs_pure, ignore_index=True)
                 gdf_consolidated_pure = gpd.GeoDataFrame(gdf_consolidated_pure, geometry='geometry', crs=success_gdfs_pure[0].crs)
-                consolidated_pure_path = os.path.join(output_base_dir, "piquetes_todos_imoveis_segmentacao_pura.shp")
+                consolidated_pure_path = os.path.join(output_base_dir, "parcelas_todos_imoveis_segmentacao_pura.shp")
                 gdf_consolidated_pure.to_file(consolidated_pure_path)
                 print(f"📦 Shapefile Consolidado de Segmentação Pura Salvo: {consolidated_pure_path}")
             except Exception as e:
@@ -468,9 +468,9 @@ def run_batch_analysis_lapig(
     print(f"⏱️ Tempo total de processamento:   {elapsed}")
     if consolidated_pasture_path:
         total_pasto_ha = sum([g['area_ha'].sum() for g in success_gdfs_pasture if 'area_ha' in g.columns])
-        total_piquetes = sum([len(g) for g in success_gdfs_pasture])
-        print(f"📊 Total de piquetes de pasto:     {total_piquetes} ({total_pasto_ha:.2f} ha)")
-        print(f"💾 Shapefile Pasto Consolidado:    {consolidated_pasture_path}")
+        total_parcelas = sum([len(g) for g in success_gdfs_pasture])
+        print(f"📊 Total de parcelas validadas:   {total_parcelas} ({total_pasto_ha:.2f} ha)")
+        print(f"💾 Shapefile Consolidado:         {consolidated_pasture_path}")
     if consolidated_pure_path:
         total_puro_ha = sum([g['area_ha'].sum() for g in success_gdfs_pure if 'area_ha' in g.columns])
         total_talhoes = sum([len(g) for g in success_gdfs_pure])

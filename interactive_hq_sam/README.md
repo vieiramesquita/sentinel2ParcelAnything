@@ -1,7 +1,7 @@
 # 🖱️ ParcelAnything: Interactive Mode (Segmentação Interativa Human-in-the-Loop)
 **LAPIG - Laboratório de Processamento de Imagens e Geoprocessamento (UFG)**
 
-O **ParcelAnything Interactive** é projetado para **operações assistidas por inteligência visual**, onde um operador humano define ou refina limites de piquetes e divisórias de pastagem através de cliques no mapa interativo.
+O **ParcelAnything Interactive** é projetado para **operações assistidas por inteligência visual**, onde um operador humano define ou refina limites de parcelas e divisórias de pastagem através de cliques no mapa interativo.
 
 ---
 
@@ -9,15 +9,15 @@ O **ParcelAnything Interactive** é projetado para **operações assistidas por 
 
 1. **Amostragem Inteligente por Pontos (HQ-SAM ViT-H)**:
    - **Ponto Positivo (`+`)**: Define o interior da pastagem a ser segmentada. Suporta múltiplos pontos positivos para unir áreas contíguas.
-   - **Ponto Negativo (`−`)**: Recorta áreas indesejadas (represas, sedes, matas), descarta piquetes adjacentes ou divide pastos contíguos por bissetriz perpendicular.
+   - **Ponto Negativo (`−`)**: Recorta áreas indesejadas (represas, sedes, matas), descarta parcelas adjacentes ou divide pastos contíguos por bissetriz perpendicular.
 2. **Confirmação Obrigatória & Refinamento**:
    - Cliques geram uma proposta visual em contorno tracejado neon (ciano).
-   - O polígono só é salvo após validação explícita do usuário no dock inferior (`Confirmar Piquete`).
-   - Permite selecionar qualquer piquete já salvo para editar ou refinar seus limites com novos pontos.
+   - O polígono só é salvo após validação explícita do usuário no dock inferior (`Confirmar Parcela`).
+   - Permite selecionar qualquer parcela já salva para editar ou refinar seus limites com novos pontos.
 3. **Entradas Flexíveis**:
    - **Coordenadas Geográficas (Lat/Lon)**: Busca em tempo real o mosaico Sentinel-2 harmonizado no Google Earth Engine.
    - **Código CAR**: Localiza a geometria do imóvel rural e faz o download automático da cobertura espectral.
-   - **Upload de Vetor**: Suporte direto para arquivos `.gpkg`, `.zip` (Shapefile) ou `.geojson`.
+   - **Upload de Vetor**: Suporte direto para arquivos `.gpkg`, `.zip` (Shapefile), `.kml`, `.kmz` ou `.geojson`.
    - **Fazendas Pré-carregadas**: Demonstrações instantâneas de imóveis em Goiás com mosaicos normalizados.
 4. **Métricas Cadastrais**:
    - Cálculo automático de área em hectares (`ha`), perímetro e pontuação de confiança da segmentação.

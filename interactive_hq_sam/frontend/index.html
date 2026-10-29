@@ -35,14 +35,14 @@
                     <span id="gpu-text">NVIDIA RTX 2080 Ti • ViT-H HQ</span>
                 </div>
                 <div class="metric-pill">
-                    <span class="metric-label">Piquetes:</span>
+                    <span class="metric-label">Parcelas:</span>
                     <span class="metric-val" id="header-paddocks-count">0</span>
                 </div>
                 <div class="metric-pill">
                     <span class="metric-label">Área Mapeada:</span>
                     <span class="metric-val" id="header-paddocks-area">0.00 ha</span>
                 </div>
-                <button id="btn-export-geojson" class="btn-primary" title="Exportar Piquetes em GeoJSON" disabled>
+                <button id="btn-export-geojson" class="btn-primary" title="Exportar Parcelas em GeoJSON" disabled>
                     <i data-lucide="download"></i>
                     <span>Exportar GeoJSON</span>
                 </button>
@@ -61,7 +61,7 @@
                     </button>
                     <button id="tab-paddocks-btn" class="tab-btn">
                         <i data-lucide="layers"></i>
-                        <span>2. Piquetes (<span id="tab-paddocks-count">0</span>)</span>
+                        <span>2. Parcelas (<span id="tab-paddocks-count">0</span>)</span>
                     </button>
                 </div>
 
@@ -141,7 +141,7 @@
                     <div class="paddocks-summary-card">
                         <div class="stat-item">
                             <span class="stat-num" id="paddocks-stat-count">0</span>
-                            <span class="stat-desc">Piquetes</span>
+                            <span class="stat-desc">Parcelas</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-num" id="paddocks-stat-area">0.0</span>
@@ -149,7 +149,7 @@
                         </div>
                         <div class="stat-item">
                             <span class="stat-num" id="paddocks-stat-avg">0.0</span>
-                            <span class="stat-desc">Média / Piquete</span>
+                            <span class="stat-desc">Média / Parcela</span>
                         </div>
                     </div>
 
@@ -157,7 +157,7 @@
                         <button id="btn-regularize-paddocks" class="btn-action w-100" title="Garantir topologia estanque (0% sobreposição e cercas retificadas via Grafo Planar)">
                             <i data-lucide="shield-check"></i> <span>Regularizar Topologia (Grafo Planar)</span>
                         </button>
-                        <button id="btn-clear-all-paddocks" class="btn-secondary text-rose mt-2 w-100" title="Excluir todos os piquetes">
+                        <button id="btn-clear-all-paddocks" class="btn-secondary text-rose mt-2 w-100" title="Excluir todas as parcelas">
                             <i data-lucide="trash-2"></i> <span>Limpar Todos</span>
                         </button>
                     </div>
@@ -165,8 +165,8 @@
                     <div id="paddocks-list" class="paddocks-list mt-3">
                         <div class="empty-state">
                             <i data-lucide="mouse-pointer-click" class="empty-icon"></i>
-                            <p>Nenhum piquete criado ainda.</p>
-                            <span>Clique sobre o pasto no mapa. Cada clique gerará imediatamente uma feição individual de piquete!</span>
+                            <p>Nenhuma parcela criada ainda.</p>
+                            <span>Clique sobre o mapa. Cada clique gerará imediatamente uma feição individual de parcela!</span>
                         </div>
                     </div>
                 </div>
@@ -209,10 +209,10 @@
                     <div class="dock-header">
                         <div class="dock-title-box">
                             <span class="dock-title" id="dock-title-text">
-                                <i data-lucide="crosshair"></i> Amostragem & Refinamento de Piquete
+                                <i data-lucide="crosshair"></i> Amostragem & Refinamento de Parcela
                             </span>
                             <span class="dock-subtitle" id="dock-status-hint">
-                                Clique no mapa para adicionar pontos de amostragem no pasto
+                                Clique no mapa para adicionar pontos de amostragem na parcela
                             </span>
                         </div>
                         <div class="dock-badges">
@@ -225,7 +225,7 @@
                     <div class="dock-controls">
                         <!-- Mode Selector (Positive: Incluir Pasto vs Negative: Excluir Área) -->
                         <div class="btn-toggle-group">
-                            <button id="btn-mode-positive" class="toggle-btn active" title="Clique no pasto para adicionar à área do piquete">
+                            <button id="btn-mode-positive" class="toggle-btn active" title="Clique no mapa para adicionar à área da parcela">
                                 <span class="dot-green"></span> Ponto Positivo (+)
                             </button>
                             <button id="btn-mode-negative" class="toggle-btn" title="Clique em estradas, matas ou vizinhos para recortar/excluir">
@@ -236,7 +236,7 @@
                         <!-- Refinement & Confirmation Buttons -->
                         <div class="dock-actions">
                             <button id="btn-confirm-paddock" class="btn-confirm-paddock" disabled title="Confirmar e salvar o polígono segmentado na coleção">
-                                <i data-lucide="check-circle-2"></i> <span id="confirm-btn-label">Confirmar Piquete</span>
+                                <i data-lucide="check-circle-2"></i> <span id="confirm-btn-label">Confirmar Parcela</span>
                             </button>
                             <button id="btn-undo-point" class="btn-secondary" disabled title="Remover o último ponto de amostragem adicionado">
                                 <i data-lucide="corner-up-left"></i> <span>Desfazer Ponto</span>

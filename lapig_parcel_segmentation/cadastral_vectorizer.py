@@ -5,7 +5,7 @@ LAPIG - Laboratório de Processamento de Imagens e Geoprocessamento
 Garantias:
 1. Eliminação total de ilhas internas / enclaves / buracos.
 2. Lances de cerca retos de mourão a mourão (2 vértices por segmento reto).
-3. Regularização retangular de piquetes regulares.
+3. Regularização retangular de parcelas regulares.
 4. Zero Sobreposições (0.000 m²) e Zero Frestas (Grafo Planar Watertight).
 """
 
@@ -147,15 +147,15 @@ def vectorize_and_straighten_parcels(sam_mask_tif, min_area_ha=2.0, straight_tol
     gdf_final['mrr_ratio'] = [round(p.area / p.minimum_rotated_rectangle.area, 2) for p in gdf_final.geometry]
     gdf_final['id'] = range(1, len(gdf_final) + 1)
 
-    print(f"✅ Vetorização retificada concluída: {len(gdf_final)} piquetes ({gdf_final['area_ha'].sum():.2f} ha)")
+    print(f"✅ Vetorização retificada concluída: {len(gdf_final)} parcelas ({gdf_final['area_ha'].sum():.2f} ha)")
     return gdf_final
 
 def clip_parcels_by_car(gdf_parcels, car_geom_or_gdf, min_area_ha=1.0):
     """
-    Recorta os piquetes perfeitamente nos limites da propriedade (CAR).
+    Recorta as parcelas perfeitamente nos limites da propriedade (CAR).
     Remove lascas de borda menores que min_area_ha e garante topologia válida.
     """
-    print("\n✂️ Recortando piquetes pelo limite do CAR...")
+    print("\n✂️ Recortando parcelas pelo limite do CAR...")
     if isinstance(car_geom_or_gdf, gpd.GeoDataFrame):
         gdf_car = car_geom_or_gdf.to_crs(gdf_parcels.crs)
     else:
@@ -176,26 +176,26 @@ def clip_parcels_by_car(gdf_parcels, car_geom_or_gdf, min_area_ha=1.0):
     gdf_clipped = gdf_clipped[gdf_clipped['area_ha'] >= min_area_ha].reset_index(drop=True)
     gdf_clipped['id'] = range(1, len(gdf_clipped) + 1)
 
-    print(f"✅ Recorte CAR finalizado: {len(gdf_clipped)} piquetes dentro do imóvel.")
+    print(f"✅ Recorte CAR finalizado: {len(gdf_clipped)} parcelas dentro do imóvel.")
     return gdf_clipped
 
-def generate_cadastral_stats(gdf_final, title="RELATÓRIO DE PIQUETES (LAPIG)"):
+def generate_cadastral_stats(gdf_final, title="RELATÓRIO DE PARCELAS (LAPIG)"):
     """Exibe relatório estatístico da segmentação."""
     total_area = gdf_final['area_ha'].sum()
-    num_piquetes = len(gdf_final)
-    avg_area = gdf_final['area_ha'].mean() if num_piquetes > 0 else 0
-    max_area = gdf_final['area_ha'].max() if num_piquetes > 0 else 0
-    min_area = gdf_final['area_ha'].min() if num_piquetes > 0 else 0
+    num_parcelas = len(gdf_final)
+    avg_area = gdf_final['area_ha'].mean() if num_parcelas > 0 else 0
+    max_area = gdf_final['area_ha'].max() if num_parcelas > 0 else 0
+    min_area = gdf_final['area_ha'].min() if num_parcelas > 0 else 0
     avg_v = gdf_final['vertices'].mean() if 'vertices' in gdf_final.columns else 0
 
     print("\n" + "=" * 50)
     print(f"📊 {title}")
     print("=" * 50)
-    print(f"🔹 Número total de piquetes:    {num_piquetes}")
-    print(f"🔹 Área total mapeada:          {total_area:.2f} ha")
-    print(f"🔹 Tamanho médio dos piquetes:   {avg_area:.2f} ha")
-    print(f"🔹 Menor piquete:               {min_area:.2f} ha")
-    print(f"🔹 Maior piquete:               {max_area:.2f} ha")
+    print(f"🔹 Número total de parcelas:     {num_parcelas}")
+    print(f"🔹 Área total mapeada:           {total_area:.2f} ha")
+    print(f"🔹 Tamanho médio das parcelas:   {avg_area:.2f} ha")
+    print(f"🔹 Menor parcela:                {min_area:.2f} ha")
+    print(f"🔹 Maior parcela:                {max_area:.2f} ha")
     if avg_v > 0:
-        print(f"🔹 Média de vértices por cerca: {avg_v:.1f} vértices")
+        print(f"🔹 Média de vértices por cerca:  {avg_v:.1f} vértices")
     print("=" * 50)

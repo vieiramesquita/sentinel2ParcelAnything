@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script de Exemplo de Execução do Pipeline Cadastral de Piquetes (LAPIG)
+Script de Exemplo de Execução do Pipeline Cadastral de Parcelas (LAPIG)
 Suporta execução com arquivo local (shp, fgb, gpkg, parquet), asset EE ou coordenadas.
 
 Exemplos de Uso com o arquivo GeoPackage do CAR de Goiás:
@@ -36,7 +36,7 @@ except ImportError:
     from pipeline_parcel_segmentation import run_analysis_lapig, run_batch_analysis_lapig
 
 def main():
-    parser = argparse.ArgumentParser(description="Execução Cadastral de Piquetes - LAPIG")
+    parser = argparse.ArgumentParser(description="Execução Cadastral de Parcelas - LAPIG")
     parser.add_argument("--input", type=str, default=None, help="Arquivo local (.shp, .gpkg, .fgb, .parquet), asset EE ou coordenada 'lat, lon'")
     parser.add_argument("--coord", type=str, default=None, help="Coordenada geográfica 'lat, lon' para busca automática no CAR")
     parser.add_argument("--id-col", type=str, default=None, dest="id_col", help="Nome da coluna de ID no arquivo vetorial (ex: cod_imovel, id)")
@@ -49,7 +49,7 @@ def main():
     parser.add_argument("--year", type=int, default=2025, help="Ano da análise (até 2025)")
     parser.add_argument("--collection", type=str, default="10m", choices=["10m", "30m"], help="Coleção MapBiomas (10m Col 4 ou 30m Col 11)")
     parser.add_argument("--output-dir", type=str, default="results", dest="output_dir", help="Diretório raiz para as pastas de resultados")
-    parser.add_argument("--min_area", type=float, default=2.0, help="Área mínima do piquete em hectares")
+    parser.add_argument("--min_area", type=float, default=2.0, help="Área mínima da parcela em hectares")
     parser.add_argument("--straight-tol", type=float, default=22.0, dest="straight_tol", help="Tolerância de simplificação/retificação de cercas (metros)")
     parser.add_argument("--no-pasture-filter", action="store_true", dest="no_pasture", help="Desabilita o filtro do MapBiomas e gera apenas a segmentação pura")
     parser.add_argument("--project", type=str, default=None, help="Projeto Google Earth Engine (opcional, usa a sessão ativa por padrão)")
@@ -162,7 +162,7 @@ def main():
 
     # Execução individual para um único imóvel
     print("=" * 70)
-    print(f"🌾 EXECUTANDO SEGMENTAÇÃO CADASTRAL DE PIQUETES (LAPIG)")
+    print(f"🌾 EXECUTANDO SEGMENTAÇÃO CADASTRAL DE PARCELAS (LAPIG)")
     print(f"   Alvo de Entrada: {target}")
     if args.id_col:
         print(f"   Coluna de ID:    {args.id_col}")
@@ -200,7 +200,7 @@ def main():
     print(f"\n🎉 Processo individual concluído com sucesso!")
     print(f"📦 Shapefile de Segmentação Pura (todos os talhões): {shp_pure} ({len(gdf_pure)} talhões)")
     if not args.no_pasture:
-        print(f"💾 Shapefile Final de Pastagem Filtrada:             {shp_pasto} ({len(gdf_pasto)} piquetes)")
+        print(f"💾 Shapefile Final de Pastagem Filtrada:             {shp_pasto} ({len(gdf_pasto)} parcelas)")
 
 if __name__ == '__main__':
     main()

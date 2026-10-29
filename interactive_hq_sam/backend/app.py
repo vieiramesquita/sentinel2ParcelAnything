@@ -357,7 +357,7 @@ def export_geojson(regularize: bool = True):
     return StreamingResponse(
         io.BytesIO(content.encode("utf-8")),
         media_type="application/geo+json",
-        headers={"Content-Disposition": f"attachment; filename=piquetes_hq_sam_{engine.active_roi_id or 'export'}.geojson"}
+        headers={"Content-Disposition": f"attachment; filename=parcelas_hq_sam_{engine.active_roi_id or 'export'}.geojson"}
     )
 
 # Monta arquivos estáticos do Frontend

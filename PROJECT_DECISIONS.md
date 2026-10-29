@@ -10,7 +10,8 @@ Este documento registra de forma persistente e cumulativa todas as decisões de 
 | :--- | :--- | :--- |
 | **Composto** / **Compostos** | **Composite** / **Composites** | Convenção padrão em sensoriamento remoto e literatura internacional (ex.: *Composite Temporal Sentinel-2 (CS+)*, *composites anuais Sentinel-2*). Aplicar no artigo e na documentação. |
 | **Hermética** / **Hermeticidade** | **Estanque** / **Estanqueidade topológica** | Termo técnico geoespacial rigoroso e consagrado em português para traduzir *watertight planar graph* (ausência total de lacunas/gaps e sobreposições/overlaps). |
-| **Apenas "Pastagem"** | **Parcelas rurais / Field boundaries** | O escopo do artigo SBSR e do método abrange o delineamento de limites cadastrais gerais de propriedades rurais (piquetes de pastagem, talhões agrícolas, áreas de pousio e reservas), e não apenas pastagens. |
+| **Piquete** / **Piquetes** (como polígono) | **Parcela** / **Parcelas** | O polígono ou unidade espacial delineada deve ser denominado estritamente **"parcela"** / **"parcelas"** (*parcels* em inglês), unificando a terminologia do projeto e eliminando a restrição exclusiva a pecuária. |
+| **Apenas "Pastagem"** | **Parcelas rurais / Field boundaries** | O escopo do artigo SBSR e do método abrange o delineamento de limites cadastrais gerais de propriedades rurais (parcelas agrícolas, talhões, áreas de pousio e reservas), e não apenas pastagens. |
 | *Omissão de interação* | **Human-in-the-loop** | Manter explicitamente no Resumo e Abstract como diferencial do modo interativo frente à segmentação puramente automática. |
 
 ---
@@ -21,7 +22,7 @@ Este documento registra de forma persistente e cumulativa todas as decisões de 
 
 - **Limite de Páginas (SBSR):** O artigo deve ter **estritamente 4 páginas**. Artigos com 5 páginas são desqualificados sumariamente pelas normas do Simpósio Brasileiro de Sensoriamento Remoto.
 - **Tamanho de Resumo e Abstract:** Exatamente entre **100 e 150 palavras** cada.
-- **Topologia de Parcelas:** **0% de sobreposição** entre polígonos adjacentes. Nenhum piquete/talhão novo pode invadir a área de um piquete já salvo no banco/sessão.
+- **Topologia de Parcelas:** **0% de sobreposição** entre polígonos adjacentes. Nenhuma parcela/talhão novo pode invadir a área de uma parcela já salva no banco/sessão.
 - **Formatação do Artigo:** Formato A4, 2 colunas, Times New Roman 10pt, sem numeração de páginas (`\pagestyle{empty}`), referências no padrão numérico IEEE/unsrt (`[1]`, `[2]`).
 
 ---
@@ -68,3 +69,4 @@ Este documento registra de forma persistente e cumulativa todas as decisões de 
 | **2026-10-28** | *Interatividade* | Implementação de corte por bisseção perpendicular para sementes negativas | Função `_clip_polygon_by_bisector` em `hq_sam_engine.py` (Eq. 1 do paper). |
 | **2026-10-29** | *Formatos / I/O* | Permitir upload de dados vetoriais em `.kml` e `.kmz` | Suporte a KMZ em `app.py`, dropzone no frontend e remoção forçada da coordenada 3D Z para GEE. |
 | **2026-10-29** | *Governança* | Criação da skill `project-decision-logger` e documento `PROJECT_DECISIONS.md` | Skill criada em `.agents/skills/project-decision-logger/` e registro persistente centralizado. |
+| **2026-10-29** | *Terminologia* | Substituição estrita de "piquete/piquetes" por "parcela/parcelas" para designar os polígonos | Atualização em todos os códigos (Python, JS), UI do aplicativo, documentação técnica e repositório GitHub (mantendo o artigo acadêmico intocado conforme instrução do usuário). |

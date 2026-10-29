@@ -22,14 +22,14 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 def main():
-    parser = argparse.ArgumentParser(description="LAPIG HQ-SAM Interactive Paddock Segmenter")
+    parser = argparse.ArgumentParser(description="LAPIG HQ-SAM Interactive Parcel Segmenter")
     parser.add_argument("--host", default="0.0.0.0", help="Host IP para escuta (default: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=8088, help="Porta TCP (default: 8088)")
     parser.add_argument("--reload", action="store_true", help="Habilita auto-reload")
     args = parser.parse_args()
 
     print("=" * 70)
-    print("🌿 LAPIG HQ-SAM - Segmentador Interativo de Piquetes por Amostragem")
+    print("🌿 LAPIG HQ-SAM - Segmentador Interativo de Parcelas por Amostragem")
     print("=" * 70)
     print(f"📡 Servidor iniciando em: http://127.0.0.1:{args.port}")
     print(f"📡 Acesso de rede local:  http://localhost:{args.port}")

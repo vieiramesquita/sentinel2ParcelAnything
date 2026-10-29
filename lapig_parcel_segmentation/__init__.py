@@ -1,5 +1,5 @@
 """
-Pacote Modular de Segmentação e Vetorização Cadastral de Piquetes
+Pacote Modular de Segmentação e Vetorização Cadastral de Parcelas
 LAPIG - Laboratório de Processamento de Imagens e Geoprocessamento (UFG)
 
 Módulos disponíveis:

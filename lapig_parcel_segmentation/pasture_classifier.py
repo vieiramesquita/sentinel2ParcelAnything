@@ -9,7 +9,7 @@ Assets Oficiais MapBiomas Suportados (até 2025):
     projects/mapbiomas-public/assets/brazil/lulc/collection11/mapbiomas_brazil_collection11_coverage_v3
 
 Objetivo:
-Filtrar e classificar o que é piquete de pastagem e o que são outras classes
+Filtrar e classificar o que é parcela de pastagem e o que são outras classes
 (mata ciliar/APP, reserva legal, corpos d'água, lavoura) SEM degradar a
 geometria retificada dos polígonos com dentes de serra de raster.
 """
@@ -114,11 +114,11 @@ def classify_and_filter_pasture_parcels(gdf_parcels, pasture_mask_tif, min_pastu
     Vantagem crítica sobre a abordagem antiga do notebook:
     - O notebook antigo multiplicava a máscara no raster (final_array = np.where(mb_data == 1, sam_filtered, 0)),
       o que destruía as bordas das cercas onde há árvores plantadas e gerava buracos internos tipo queijo suíço.
-    - Esta abordagem calcula o percentual de cobertura de pasto (% de pixels do MapBiomas Classe 15) dentro de cada piquete.
+    - Esta abordagem calcula o percentual de cobertura de pasto (% de pixels do MapBiomas Classe 15) dentro de cada parcela.
       Se o polígono é majoritariamente pasto (>= 35-40%), sua cerca reta mourão-a-mourão é preservada integralmente.
       Polígonos que são reservas florestais, rios ou sedes são separados para auditoria ou descartados.
     """
-    print(f"\n🌾 Classificando e filtrando piquetes de pastagem...")
+    print(f"\n🌾 Classificando e filtrando parcelas de pastagem...")
     print(f"   Polígonos de entrada: {len(gdf_parcels)}")
 
     with rasterio.open(pasture_mask_tif) as src_mb:
@@ -174,7 +174,7 @@ def classify_and_filter_pasture_parcels(gdf_parcels, pasture_mask_tif, min_pastu
     gdf_pasture = gdf_aligned[gdf_aligned['is_pasture']].copy().reset_index(drop=True)
     gdf_others = gdf_aligned[~gdf_aligned['is_pasture']].copy().reset_index(drop=True)
 
-    print(f"   ✅ Piquetes de pastagem confirmados: {len(gdf_pasture)} ({gdf_pasture['area_ha'].sum():.2f} ha)")
+    print(f"   ✅ Parcelas de pastagem confirmadas: {len(gdf_pasture)} ({gdf_pasture['area_ha'].sum():.2f} ha)")
     print(f"   🌲 Polígonos de outras classes (mata/APP/sede): {len(gdf_others)} ({gdf_others['area_ha'].sum():.2f} ha)")
 
     return gdf_pasture, gdf_others

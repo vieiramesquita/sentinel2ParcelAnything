@@ -1,4 +1,4 @@
-# 🛰️ ParcelAnything: Segmentação & Vetorização Cadastral de Piquetes de Pastagem (LAPIG)
+# 🛰️ ParcelAnything: Segmentação & Vetorização Cadastral de Parcelas Rurais (LAPIG)
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](https://python.org)
 [![PyTorch CUDA](https://img.shields.io/badge/PyTorch-CUDA%20Accelerated-EE4C2C.svg?logo=pytorch&logoColor=white)](https://pytorch.org)
@@ -9,13 +9,13 @@
 [![Benchmark Auditado](https://img.shields.io/badge/Benchmark-21%20Im%C3%B3veis%20%7C%2049.8k%20ha-blue.svg)](#-2-desempenho--recursos-computacionais)
 
 **Laboratório de Processamento de Imagens e Geoprocessamento (LAPIG / UFG)**  
-*O **ParcelAnything** é uma suite modular de alto desempenho dividida em dois modos complementares para extração de piquetes e divisórias de pastagem com cercas retilíneas (mourão a mourão), topologia planar estanque (Zero Overlaps), validação zonal pelo MapBiomas (10m / 30m) e telemetria contínua de hardware.*
+*O **ParcelAnything** é uma suite modular de alto desempenho dividida em dois modos complementares para extração de parcelas agrícolas e divisórias territoriais com cercas retilíneas (mourão a mourão), topologia planar estanque (Zero Overlaps), validação zonal pelo MapBiomas (10m / 30m) e telemetria contínua de hardware.*
 
 ---
 
 ## 🗺️ Visão Geral: As Duas Abordagens Consolidadas
 
-O projeto organiza a segmentação e vetorização cadastral de pastagens em **dois modos complementares e independentes**:
+O projeto organiza a segmentação e vetorização cadastral de parcelas em **dois modos complementares e independentes**:
 
 ```
 Vectorization_Pro/
@@ -47,7 +47,7 @@ Vectorization_Pro/
 | **Intervenção** | **Human-in-the-Loop:** Cliques com pontos positivos (`+`) e negativos (`−`) | **Zero intervenção:** Execução autônoma ponta a ponta |
 | **Modelo de IA** | HQ-SAM ViT-H com amostragem pontual interativa e recortes inteligentes | SAMGeo ViT-H com segmentação automática em grade |
 | **Interface** | Web (Leaflet dark glassmorphism na porta `8088` com dock neon) | Linha de comando (CLI) ou script Python / Jupyter |
-| **Validação** | O operador valida visualmente e clica em "Confirmar Piquete" | Dominância zonal automática pelo MapBiomas (pastagem) |
+| **Validação** | O operador valida visualmente e clica em "Confirmar Parcela" | Dominância zonal automática pelo MapBiomas (pastagem) |
 | **Saídas** | GeoJSON exportável pelo navegador com métricas em tempo real | Shapefiles duplos (`segmentacao_pura` e `pastagem_final`) |
 
 ---
@@ -57,13 +57,13 @@ Vectorization_Pro/
 O **sentinel2parcel** transforma imagens multiespectrais do Sentinel-2 em polígonos vetoriais prontos para SIG e cadastro rural. Ao contrário de abordagens ingênuas de vetorização (como `gdal_polygonize` ou simplificação independente de polígonos), o método utiliza **Grafos Planares** que simplificam arestas compartilhadas, eliminam dentes de serra (degraus de 10m) e garantem **0 sobreposições e 0 frestas (Topologia Watertight)**.
 
 ### Caso 1: Imóvel Rural em Caiapônia (GO) — 749,52 ha
-> **Destaques:** Segmentação de 42 piquetes de pastagem retificados. Preservação precisa da mata ciliar (APP) e corpo d'água ao centro, eliminando completamente os enclaves e ilhas de ruído do Deep Learning.
+> **Destaques:** Segmentação de 42 parcelas retificadas. Preservação precisa da mata ciliar (APP) e corpo d'água ao centro, eliminando completamente os enclaves e ilhas de ruído do Deep Learning.
 ![Resultados Caiapônia](images/fig_caiaponia_results.png)
 
 ---
 
 ### Caso 2: Imóvel Rural em Paranaíba (MS) — 1.085,22 ha
-> **Destaques:** Imóvel de grande extensão cortado diagonalmente por ferrovia e rodovia. O algoritmo respeitou as divisórias estruturais externas e extraiu 54 piquetes retilíneos bem delimitados.
+> **Destaques:** Imóvel de grande extensão cortado diagonalmente por ferrovia e rodovia. O algoritmo respeitou as divisórias estruturais externas e extraiu 54 parcelas retilíneas bem delimitadas.
 ![Resultados Paranaíba](images/fig_paranaiba_results.png)
 
 ---
@@ -76,14 +76,14 @@ O **sentinel2parcel** transforma imagens multiespectrais do Sentinel-2 em políg
 
 ## ⚡ 2. Desempenho & Recursos Computacionais
 
-O **sentinel2parcel** foi submetido a um teste de estresse e auditoria contínua em lote (*stress test batch*) com **21 imóveis rurais** (20 em Goiás e 1 no Mato Grosso do Sul) selecionados em polos de pecuária intensiva e grande extensão territorial, totalizando **49.760,02 hectares** de área perimetral cadastral analisada.
+O **sentinel2parcel** foi submetido a um teste de estresse e auditoria contínua em lote (*stress test batch*) com **21 imóveis rurais** (20 em Goiás e 1 no Mato Grosso do Sul) selecionados em polos de grande extensão territorial, totalizando **49.760,02 hectares** de área perimetral cadastral analisada.
 
 ### Visão Geral de Performance Auditada (Hardware: RTX 2080 Ti 11 GB)
-* **Volume Cadastral:** **1.861 piquetes de pastagem** retilíneos delimitados (**44.253,17 ha**) e **2.010 talhões físicos** na segmentação pura (**47.479,02 ha**).
+* **Volume Cadastral:** **1.861 parcelas agrícolas produtivas** delimitadas (**44.253,17 ha**) e **2.010 parcelas físicas** na segmentação pura (**47.479,02 ha**).
 * **Tempo Total de GPU:** **122,81 minutos (~2,05 horas)** de processamento contínuo acumulado.
 * **Tempo Médio por Imóvel:** **~5,85 minutos** (~351 s), variando de **2,5 min** em fazendas médias de topografia uniforme a **8 a 9,5 min** em megaprojetos de grande porte (>9.000 a 10.800 ha).
 * **Pico de VRAM Alocada:** Média de **6,41 GB**, operando confortavelmente em **6,47 GB** (58,8% da GPU) e com pico máximo de **9,54 GB** (86,7% da GPU) no imóvel de maior extensão territorial (10.828,8 ha em Goiás).
-* **Topologia Watertight:** **0 sobreposições e 0 frestas** comprovadas em 100% dos 1.861 piquetes gerados.
+* **Topologia Watertight:** **0 sobreposições e 0 frestas** comprovadas em 100% das 1.861 parcelas geradas.
 * **Estabilidade Térmica:** Temperatura da GPU permaneceu controlada (pico registrado de **70 °C** sob carga total de inferência).
 
 ### Decomposição do Esforço Computacional (Profiling por Etapa)
@@ -97,7 +97,7 @@ O **sentinel2parcel** foi submetido a um teste de estresse e auditoria contínua
 
 ### Auditoria Detalhada dos 21 Imóveis Processados:
 
-| Município | ID Imóvel (CAR) | Área CAR | Piquetes Pasto | Talhões Puros | Tempo Total | Pico VRAM |
+| Município | ID Imóvel (CAR) | Área CAR | Parcelas Validadas | Parcelas Puras | Tempo Total | Pico VRAM |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Goiás (GO)** | `GO-5208905-F49642881887...` | 10.828,80 ha | 345 | 354 | 8,2 min | 9,54 GB |
 | **Nova Crixás (GO)** | `GO-5214838-32EB159D2A3C...` | 9.719,91 ha | 224 | 267 | 1,0 min | 0,01 GB |
@@ -181,12 +181,12 @@ Para viabilizar execuções em lote sem risco de estouros de memória (*CUDA Out
  (pasto_cov, ndvi_med, is_pasto, classe)                              (MapBiomas 10m Col 4 / 30m Col 11)
          │                                                                     │
          ▼                                                                     ▼
- Shapefile: piquetes_segmentacao_pura_{ID}.shp      Shapefile: piquetes_finais_cercas_retas_{ID}.shp
+ Shapefile: parcelas_segmentacao_pura_{ID}.shp      Shapefile: parcelas_finais_cercas_retas_{ID}.shp
 ```
 
 ### Camadas de Saída Geradas:
-1. **`piquetes_segmentacao_pura_{ID}.shp`:** Delimitação de **todos** os compartimentos e divisórias físicas identificadas dentro da propriedade, contendo colunas com percentual de sobreposição de pastagem, NDVI médio e classe de uso.
-2. **`piquetes_finais_cercas_retas_{ID}.shp`:** Camada estrita de pastagem, filtrada por dominância zonal do MapBiomas (pastagens com mais de 30% a 50% de área validada).
+1. **`parcelas_segmentacao_pura_{ID}.shp`:** Delimitação de **todas** as parcelas e divisórias físicas identificadas dentro da propriedade, contendo colunas com percentual de sobreposição de uso, NDVI médio e classe.
+2. **`parcelas_finais_cercas_retas_{ID}.shp`:** Camada de parcelas produtivas com divisórias retilíneas, filtrada por dominância zonal do MapBiomas.
 3. **`nao_pastagem_auditoria.shp`:** Geometrias descartadas (lavouras, matas nativas, represas, infraestruturas) para fins de conferência técnica.
 4. **`relatorio_benchmark_hardware.json` & `.txt`:** Auditoria de hardware e consumo da GPU por propriedade.
 

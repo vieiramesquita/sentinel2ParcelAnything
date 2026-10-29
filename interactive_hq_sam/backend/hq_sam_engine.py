@@ -2,7 +2,7 @@
 Motor de Segmentação Interativa com HQ-SAM (Segment Anything High Quality)
 LAPIG - Laboratório de Processamento de Imagens e Geoprocessamento (UFG)
 
-Permite segmentação interativa de piquetes por amostragem pontual (prompts do usuário)
+Permite segmentação interativa de parcelas por amostragem pontual (prompts do usuário)
 utilizando o modelo ViT-H com aceleração via GPU NVIDIA.
 """
 
@@ -598,7 +598,7 @@ class HQSamEngine:
         project_to_wgs84 = pyproj.Transformer.from_crs(src_crs, "EPSG:4326", always_xy=True).transform
         project_to_src = pyproj.Transformer.from_crs("EPSG:4326", src_crs, always_xy=True).transform
 
-        # Ponto de referência e lista de pontos positivos e negativos para isolar e seccionar a feição do piquete
+        # Ponto de referência e lista de pontos positivos e negativos para isolar e seccionar a feição da parcela
         pos_points = [p for p in points if int(p.get('label', 1)) == 1]
         neg_points = [p for p in points if int(p.get('label', 1)) == 0]
         
@@ -618,7 +618,7 @@ class HQSamEngine:
             rx, ry = project_to_src(points[0]['lon'], points[0]['lat'])
             target_pt = Point(rx, ry)
 
-        # Prepara união dos piquetes já salvos no CRS do raster para prevenção de sobreposição em tempo real
+        # Prepara união das parcelas já salvas no CRS do raster para prevenção de sobreposição em tempo real
         saved_src_union = None
         if self.saved_paddocks:
             saved_src_geoms = []
@@ -699,7 +699,7 @@ class HQSamEngine:
                         closest_pos = min(src_pos_pts, key=lambda pt: pt.distance(neg_pt))
                         selected_poly = self._clip_polygon_by_bisector(selected_poly, closest_pos, neg_pt)
 
-            # 2. Prevenção de Sobreposição em Tempo Real com Piquetes já Existentes (0% Overlap)
+            # 2. Prevenção de Sobreposição em Tempo Real com Parcelas já Existentes (0% Overlap)
             if saved_src_union is not None and selected_poly.intersects(saved_src_union):
                 diff = selected_poly.difference(saved_src_union)
                 if not diff.is_empty:
@@ -799,9 +799,9 @@ class HQSamEngine:
         return round(area_m2 / 10000.0, 2)
 
     def save_paddock(self, paddock_data, prevent_overlap=True):
-        """Salva um piquete confirmado garantindo estanqueidade topológica (0% de sobreposição com outros)."""
+        """Salva uma parcela confirmada garantindo estanqueidade topológica (0% de sobreposição com outras)."""
         pid = paddock_data.get('id') or str(uuid.uuid4())[:8]
-        name = paddock_data.get('name') or f"Piquete {len(self.saved_paddocks) + 1}"
+        name = paddock_data.get('name') or f"Parcela {len(self.saved_paddocks) + 1}"
         
         poly_shp = shape(paddock_data.get('geojson'))
         if not poly_shp.is_valid:
@@ -844,7 +844,7 @@ class HQSamEngine:
         return record
 
     def update_paddock(self, paddock_id, paddock_data):
-        """Atualiza a geometria e métricas de um piquete existente garantindo topologia limpa."""
+        """Atualiza a geometria e métricas de uma parcela existente garantindo topologia limpa."""
         for p in self.saved_paddocks:
             if p['id'] == paddock_id:
                 if 'name' in paddock_data and paddock_data['name']:
@@ -858,7 +858,7 @@ class HQSamEngine:
                     if not poly_shp.is_valid:
                         poly_shp = poly_shp.buffer(0)
                     
-                    # Subtrai outros piquetes (exceto o próprio)
+                    # Subtrai outras parcelas (exceto a própria)
                     other_geoms = [shape(sp['geojson']) for sp in self.saved_paddocks if sp['id'] != paddock_id and sp.get('geojson')]
                     if other_geoms:
                         other_union = unary_union(other_geoms)
@@ -874,11 +874,11 @@ class HQSamEngine:
                     p['geojson'] = mapping(poly_shp)
                     p['area_ha'] = self._calc_area_ha(poly_shp, is_wgs84=True)
                 return p
-        raise ValueError(f"Piquete {paddock_id} não encontrado.")
+        raise ValueError(f"Parcela {paddock_id} não encontrada.")
 
     def regularize_paddocks_topology(self, straight_tol=18.0):
         """
-        Reconstrói todos os piquetes da sessão em um Grafo Planar Estanque (Watertight Planar Graph).
+        Reconstrói todas as parcelas da sessão em um Grafo Planar Estanque (Watertight Planar Graph).
         Retifica cercas comuns via distância de Hausdorff, elimina frestas/slivers e garante 0% de sobreposições mútuas.
         """
         if not self.saved_paddocks:
@@ -926,7 +926,7 @@ class HQSamEngine:
         noded_straight = shapely.node(unary_union(straight_lines))
         reconstructed = list(polygonize(noded_straight))
 
-        # 5. Atribuição de Células aos Piquetes Originais
+        # 5. Atribuição de Células às Parcelas Originais
         assigned_cells = {p['id']: [] for p in self.saved_paddocks}
         for cell in reconstructed:
             if cell.area < 100.0:  # Descarta micro-ruídos menores que 100m²
@@ -941,7 +941,7 @@ class HQSamEngine:
             if best_id and max_inter > (cell.area * 0.2):
                 assigned_cells[best_id].append(cell)
 
-        # 6. Atualização dos Piquetes Salvos
+        # 6. Atualização das Parcelas Salvas
         updated_paddocks = []
         for p in self.saved_paddocks:
             pid = p['id']
@@ -969,12 +969,12 @@ class HQSamEngine:
         }
 
     def delete_paddock(self, paddock_id):
-        """Remove um piquete por ID."""
+        """Remove uma parcela por ID."""
         self.saved_paddocks = [p for p in self.saved_paddocks if p['id'] != paddock_id]
         return len(self.saved_paddocks)
 
     def clear_session(self):
-        """Limpa piquetes e rascunhos da sessão atual."""
+        """Limpa parcelas e rascunhos da sessão atual."""
         self.saved_paddocks = []
         self.current_prompt_points = []
         self.last_candidate_masks = None

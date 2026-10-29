@@ -1,6 +1,6 @@
 /**
- * LAPIG HQ-SAM Paddock Segmenter - Client Application Logic
- * Padrão Oficial: Sentinel-2 (Segmentação por Amostragem com 1 Clique = 1 Piquete Individual)
+ * LAPIG HQ-SAM Parcel Segmenter - Client Application Logic
+ * Padrão Oficial: Sentinel-2 (Segmentação por Amostragem com 1 Clique = 1 Parcela Individual)
  * Auxiliares Visuais: Google Satellite e ESRI World Imagery
  */
 
@@ -16,10 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
         currentMode: 'positive',   // 'positive' (incluir pasto) ou 'negative' (excluir/recortar)
         activeRoi: null,           // Dados do ROI atual retornado pelo backend
         savedPaddocks: [],         // [{ id, name, area_ha, confidence_score, geojson, layer, points }]
-        lastPaddockId: null,       // ID do último piquete criado
+        lastPaddockId: null,       // ID da última parcela criada
         overlayLayer: null,        // L.ImageOverlay da imagem Sentinel-2 do imóvel
         carLayer: null,            // L.GeoJSON do limite do imóvel (CAR)
-        paddocksLayer: null,       // L.FeatureGroup com todos os piquetes individuais salvos
+        paddocksLayer: null,       // L.FeatureGroup com todas as parcelas individuais salvas
         activeBasemap: 's2',       // 's2', 'google', 'esri'
         isOverlayVisible: true,    // Exibição da sobreposição Sentinel-2
 
@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
         candidatePoints: [],       // [{ id, lon, lat, label, marker }]
         candidateMask: null,       // { mask_index, confidence_score, area_ha, geojson }
         candidateLayer: null,      // L.GeoJSON com o preview do polígono em refinamento
-        editingPaddockId: null     // ID do piquete que está sendo editado/refinado (null se for novo)
+        editingPaddockId: null     // ID da parcela que está sendo editada/refinada (null se for novo)
     };
 
     // =========================================================================
@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     L.control.zoom({ position: 'topleft' }).addTo(map);
 
-    // FeatureGroup para armazenar todos os piquetes individuais
+    // FeatureGroup para armazenar todas as parcelas individuais
     state.paddocksLayer = L.featureGroup().addTo(map);
 
     // =========================================================================
@@ -587,8 +587,8 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.candidateScoreBadge.style.display = 'none';
             dom.candidateAreaBadge.style.display = 'none';
 
-            dom.dockTitleText.innerHTML = '<i data-lucide="crosshair"></i> Amostragem & Refinamento de Piquete';
-            dom.dockStatusHint.innerText = 'Clique no mapa para adicionar pontos de amostragem no pasto';
+            dom.dockTitleText.innerHTML = '<i data-lucide="crosshair"></i> Amostragem & Refinamento de Parcela';
+            dom.dockStatusHint.innerText = 'Clique no mapa para adicionar pontos de amostragem na parcela';
             if (window.lucide) lucide.createIcons();
             return;
         }
@@ -601,7 +601,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.candidatePointsBadge.innerText = `${total} pt (${posCount}+ / ${negCount}−)`;
         dom.candidatePointsBadge.style.display = 'inline-block';
 
-        // É necessário ao menos 1 ponto positivo para delimitar o piquete
+        // É necessário ao menos 1 ponto positivo para delimitar a parcela
         if (posCount === 0) {
             if (state.candidateLayer) {
                 map.removeLayer(state.candidateLayer);
@@ -612,7 +612,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.btnConfirmPaddock.classList.remove('ready');
             dom.candidateScoreBadge.style.display = 'none';
             dom.candidateAreaBadge.style.display = 'none';
-            dom.dockStatusHint.innerText = 'Adicione ao menos um ponto positivo (+) no interior do pasto para segmentar.';
+            dom.dockStatusHint.innerText = 'Adicione ao menos um ponto positivo (+) no interior da área para segmentar.';
             return;
         }
 
@@ -664,14 +664,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 dom.btnConfirmPaddock.classList.add('ready');
 
                 if (state.editingPaddockId) {
-                    dom.dockTitleText.innerHTML = '<i data-lucide="edit-3"></i> Refinando Piquete Existente';
+                    dom.dockTitleText.innerHTML = '<i data-lucide="edit-3"></i> Refinando Parcela Existente';
                     dom.dockStatusHint.innerText = `Área calculada: ${bestMask.area_ha} ha. Adicione/remova pontos ou confirme as alterações.`;
                 } else {
-                    dom.dockTitleText.innerHTML = '<i data-lucide="crosshair"></i> Rascunho de Piquete Proposto';
+                    dom.dockTitleText.innerHTML = '<i data-lucide="crosshair"></i> Rascunho de Parcela Proposta';
                     dom.dockStatusHint.innerText = `Polígono gerado: ${bestMask.area_ha} ha (${bestMask.confidence_score}%). Confirme para salvar.`;
                 }
             } else {
-                dom.dockStatusHint.innerText = 'Nenhum piquete identificado nesta combinação de pontos. Ajuste os cliques.';
+                dom.dockStatusHint.innerText = 'Nenhuma parcela identificada nesta combinação de pontos. Ajuste os cliques.';
                 dom.btnConfirmPaddock.disabled = true;
                 dom.btnConfirmPaddock.classList.remove('ready');
             }
@@ -712,7 +712,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         state.candidateMask = null;
 
-        // Se estava editando um piquete salvo, restaura opacidade original de seu layer
+        // Se estava editando uma parcela salva, restaura opacidade original de seu layer
         if (state.editingPaddockId) {
             const p = state.savedPaddocks.find(item => item.id === state.editingPaddockId);
             if (p && p.layer) {
@@ -721,7 +721,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.editingPaddockId = null;
         }
 
-        dom.confirmBtnLabel.innerText = "Confirmar Piquete";
+        dom.confirmBtnLabel.innerText = "Confirmar Parcela";
         dom.btnConfirmPaddock.disabled = true;
         dom.btnConfirmPaddock.classList.remove('ready');
         dom.btnUndoPoint.disabled = true;
@@ -731,8 +731,8 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.candidateScoreBadge.style.display = 'none';
         dom.candidateAreaBadge.style.display = 'none';
 
-        dom.dockTitleText.innerHTML = '<i data-lucide="crosshair"></i> Amostragem & Refinamento de Piquete';
-        dom.dockStatusHint.innerText = 'Clique no mapa para adicionar pontos de amostragem no pasto';
+        dom.dockTitleText.innerHTML = '<i data-lucide="crosshair"></i> Amostragem & Refinamento de Parcela';
+        dom.dockStatusHint.innerText = 'Clique no mapa para adicionar pontos de amostragem na parcela';
 
         // Volta para o modo positivo
         state.currentMode = 'positive';
@@ -752,7 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (state.editingPaddockId) {
             // =================================================================
-            // ATUALIZAÇÃO DE PIQUETE EXISTENTE
+            // ATUALIZAÇÃO DE PARCELA EXISTENTE
             // =================================================================
             const pIdx = state.savedPaddocks.findIndex(p => p.id === state.editingPaddockId);
             if (pIdx !== -1) {
@@ -797,10 +797,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else {
             // =================================================================
-            // CRIAÇÃO E CONFIRMAÇÃO DE NOVO PIQUETE
+            // CRIAÇÃO E CONFIRMAÇÃO DE NOVA PARCELA
             // =================================================================
             const paddockNumber = state.savedPaddocks.length + 1;
-            const paddockName = `Piquete ${paddockNumber}`;
+            const paddockName = `Parcela ${paddockNumber}`;
 
             try {
                 const res = await fetch('/api/paddock/save', {
@@ -842,13 +842,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 updatePaddocksStats();
                 renderPaddocksList();
             } catch (err) {
-                alert(`Falha ao salvar piquete: ${err.message}`);
+                alert(`Falha ao salvar parcela: ${err.message}`);
             }
         }
     });
 
     /**
-     * Cria a camada visual permanente do piquete no Leaflet
+     * Cria a camada visual permanente da parcela no Leaflet
      */
     function createPaddockMapLayer(p) {
         const layer = L.geoJSON(p.geojson, {
@@ -865,7 +865,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span style="font-size: 0.8rem; color: #94a3b8;">Confiança HQ-SAM: <strong>${p.confidence_score}%</strong></span>
                 <div style="margin-top: 10px;">
                     <button class="btn-primary" style="padding: 5px 10px; font-size: 0.74rem; width: 100%; justify-content: center;" onclick="window.editPaddockFromPopup('${p.id}')">
-                        <i data-lucide="edit-3"></i> Refinar este Piquete
+                        <i data-lucide="edit-3"></i> Refinar esta Parcela
                     </button>
                 </div>
             </div>
@@ -881,7 +881,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Inicia o modo de refinamento de um piquete já existente
+     * Inicia o modo de refinamento de uma parcela já existente
      */
     function startEditPaddock(id) {
         const p = state.savedPaddocks.find(item => item.id === id);
@@ -891,7 +891,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearCandidateSession();
 
         state.editingPaddockId = p.id;
-        dom.confirmBtnLabel.innerText = "Atualizar Piquete";
+        dom.confirmBtnLabel.innerText = "Atualizar Parcela";
 
         // Deixa a camada atual com transparência suave para visualização
         if (p.layer) {
@@ -926,7 +926,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         refreshCandidatePrediction();
 
-        // Enquadra o piquete no mapa
+        // Enquadra a parcela no mapa
         const tempLayer = L.geoJSON(p.geojson);
         map.fitBounds(tempLayer.getBounds(), { padding: [60, 60], maxZoom: 18 });
     }
@@ -937,7 +937,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // =========================================================================
-    // Gerenciamento e Exibição de Piquetes
+    // Gerenciamento e Exibição de Parcelas
     // =========================================================================
     function updatePaddocksStats() {
         const count = state.savedPaddocks.length;
@@ -962,8 +962,8 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.paddocksList.innerHTML = `
                 <div class="empty-state">
                     <i data-lucide="mouse-pointer-click" class="empty-icon"></i>
-                    <p>Nenhum piquete criado ainda.</p>
-                    <span>Clique sobre o pasto no mapa. Adicione/remova pontos de refinamento e clique em 'Confirmar Piquete' para salvar!</span>
+                    <p>Nenhuma parcela criada ainda.</p>
+                    <span>Clique sobre o mapa. Adicione/remova pontos de refinamento e clique em 'Confirmar Parcela' para salvar!</span>
                 </div>
             `;
             if (window.lucide) lucide.createIcons();
@@ -983,30 +983,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
                 <div class="paddock-actions">
-                    <button class="btn-edit-paddock" data-id="${p.id}" title="Refinar e ajustar polígono deste piquete">
+                    <button class="btn-edit-paddock" data-id="${p.id}" title="Refinar e ajustar polígono desta parcela">
                         <i data-lucide="edit-3"></i>
                     </button>
-                    <button class="btn-del-paddock" data-id="${p.id}" title="Excluir piquete">
+                    <button class="btn-del-paddock" data-id="${p.id}" title="Excluir parcela">
                         <i data-lucide="trash"></i>
                     </button>
                 </div>
             `;
 
-            // Clique no card foca no piquete
+            // Clique no card foca na parcela
             card.addEventListener('click', (e) => {
                 if (e.target.closest('.paddock-actions')) return;
                 const tempLayer = L.geoJSON(p.geojson);
                 map.fitBounds(tempLayer.getBounds(), { padding: [50, 50], maxZoom: 18 });
             });
 
-            // Botão refinar piquete
+            // Botão refinar parcela
             const btnEdit = card.querySelector('.btn-edit-paddock');
             btnEdit.addEventListener('click', (e) => {
                 e.stopPropagation();
                 startEditPaddock(p.id);
             });
 
-            // Botão excluir piquete
+            // Botão excluir parcela
             const btnDel = card.querySelector('.btn-del-paddock');
             btnDel.addEventListener('click', async (e) => {
                 e.stopPropagation();
@@ -1037,7 +1037,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPaddocksList();
             updatePaddocksStats();
         } catch (err) {
-            console.error("Erro ao deletar piquete:", err);
+            console.error("Erro ao deletar parcela:", err);
         }
     }
 
@@ -1055,20 +1055,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     dom.btnClearAllPaddocks.addEventListener('click', async () => {
         if (state.savedPaddocks.length === 0) return;
-        if (!confirm("Deseja realmente excluir todos os piquetes da sessão?")) return;
+        if (!confirm("Deseja realmente excluir todas as parcelas da sessão?")) return;
 
         try {
             await fetch('/api/paddocks/clear', { method: 'POST' });
             clearAllPaddocks();
         } catch (err) {
-            console.error("Erro ao limpar piquetes:", err);
+            console.error("Erro ao limpar parcelas:", err);
         }
     });
 
     if (dom.btnRegularizePaddocks) {
         dom.btnRegularizePaddocks.addEventListener('click', async () => {
             if (state.savedPaddocks.length === 0) {
-                alert("Nenhum piquete para regularizar.");
+                alert("Nenhuma parcela para regularizar.");
                 return;
             }
             try {
@@ -1083,7 +1083,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Limpa camadas anteriores no mapa
                     state.paddocksLayer.clearLayers();
 
-                    // Reassocia e redesenha os piquetes atualizados
+                    // Reassocia e redesenha as parcelas atualizadas
                     state.savedPaddocks = data.paddocks.map(p => {
                         const newLayer = createPaddockMapLayer(p);
                         return { ...p, layer: newLayer };
@@ -1091,7 +1091,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     updatePaddocksStats();
                     renderPaddocksList();
-                    alert(`Topologia estanque regularizada com sucesso via Grafo Planar!\n0% de sobreposições em ${data.count} piquetes.`);
+                    alert(`Topologia estanque regularizada com sucesso via Grafo Planar!\n0% de sobreposições em ${data.count} parcelas.`);
                 } else {
                     alert("Aviso na regularização de topologia.");
                 }
