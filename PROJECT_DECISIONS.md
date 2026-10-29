@@ -23,6 +23,7 @@ Este documento registra de forma persistente e cumulativa todas as decisões de 
 - **Limite de Páginas (SBSR):** O artigo deve ter **estritamente 4 páginas**. Artigos com 5 páginas são desqualificados sumariamente pelas normas do Simpósio Brasileiro de Sensoriamento Remoto.
 - **Tamanho de Resumo e Abstract:** Exatamente entre **100 e 150 palavras** cada.
 - **Topologia de Parcelas:** **0% de sobreposição** entre polígonos adjacentes. Nenhuma parcela/talhão novo pode invadir a área de uma parcela já salva no banco/sessão.
+- **Privacidade de Skills e Artigo:** Diretórios de skills (`.agents/`, `skills/`), manuscritos acadêmicos (`paper/`) e arquivos de segredos (`.env`, chaves) **NUNCA** devem ser rastreados ou enviados ao GitHub. Skills proprietárias residem no diretório global `~/.gemini/config/skills/`.
 - **Formatação do Artigo:** Formato A4, 2 colunas, Times New Roman 10pt, sem numeração de páginas (`\pagestyle{empty}`), referências no padrão numérico IEEE/unsrt (`[1]`, `[2]`).
 
 ---
@@ -70,3 +71,5 @@ Este documento registra de forma persistente e cumulativa todas as decisões de 
 | **2026-10-29** | *Formatos / I/O* | Permitir upload de dados vetoriais em `.kml` e `.kmz` | Suporte a KMZ em `app.py`, dropzone no frontend e remoção forçada da coordenada 3D Z para GEE. |
 | **2026-10-29** | *Governança* | Criação da skill `project-decision-logger` e documento `PROJECT_DECISIONS.md` | Skill criada em `.agents/skills/project-decision-logger/` e registro persistente centralizado. |
 | **2026-10-29** | *Terminologia* | Substituição estrita de "piquete/piquetes" por "parcela/parcelas" para designar os polígonos | Atualização em todos os códigos (Python, JS), UI do aplicativo, documentação técnica e repositório GitHub (mantendo o artigo acadêmico intocado conforme instrução do usuário). |
+| **2026-10-29** | *Segurança / Skills* | Criação da skill global `git-sensitive-guard` e centralização de todas as skills em `~/.gemini/config/skills/` | Prevenção de vazamento de skills proprietárias, artigos científicos (`paper/`) e credenciais; skills removidas do repositório git. |
+| **2026-10-29** | *Documentação* | Reformulação completa do `README.md` com guia didático e exaustivo de uso dos dois algoritmos | Adição de tabela de parâmetros do CLI, cenários práticos de execução (coordenada, CAR, batch, puro) e workflow visual do modo interativo. |

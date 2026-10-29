@@ -19,19 +19,19 @@ O projeto organiza a segmentação e vetorização cadastral de parcelas em **do
 
 ```
 Vectorization_Pro/
-├── 🖱️ interactive_hq_sam/          # ParcelAnything: INTERACTIVE MODE (Human-in-the-Loop)
+├── 🖱️ interactive_hq_sam/          # MODO 1: INTERATIVO (Human-in-the-Loop)
 │   ├── backend/                     # API FastAPI + PyTorch ViT-H na GPU (CUDA)
 │   ├── frontend/                    # Interface Web Leaflet com dock de confirmação e refinamento (+/-)
 │   └── run_interactive_app.py       # Inicializador: python run_interactive_app.py --port 8088
 │
-├── ⚙️ lapig_parcel_segmentation/    # ParcelAnything: AUTO MODE (Processamento em Lote)
+├── ⚙️ lapig_parcel_segmentation/    # MODO 2: AUTOMÁTICO (Batch Pipeline em Lote)
 │   ├── pipeline_parcel_segmentation # Orquestrador principal de ponta a ponta
-│   ├── roi_resolver.py              # Resolução de geometrias (CAR / Shapefile / Coordenadas)
+│   ├── roi_resolver.py              # Resolução universal de geometrias (CAR / Shapefile / Coordenadas)
 │   ├── s2_mosaic.py                 # Mosaicos temporais Sentinel-2 Harmonized (GEE CS+)
 │   ├── sam_segmenter.py             # Inferência SAMGeo ViT-H em grade com controle estrito de VRAM
 │   ├── pasture_classifier.py        # Validação zonal MapBiomas pastagem (10m Col 4 / 30m Col 11)
 │   ├── cadastral_vectorizer.py      # Grafo Planar Watertight (Zero Overlaps, cercas retilíneas)
-│   └── example_run.py               # CLI: python -m lapig_parcel_segmentation.example_run --all
+│   └── example_run.py               # CLI: python -m lapig_parcel_segmentation.example_run
 │
 ├── 🌐 sentinel2parcel_test/         # SHOWCASE WEB: Demonstração estática pública no GitHub Pages
 │   └── (Live em https://vieiramesquita.github.io/sentinel2parcel_test/)
@@ -41,13 +41,14 @@ Vectorization_Pro/
 └── 📓 run_in_jupyter.ipynb          # Notebook de demonstração e execução interativa do Auto Mode
 ```
 
-| Critério | 🖱️ ParcelAnything: Interactive Mode (`interactive_hq_sam/`) | ⚙️ ParcelAnything: Auto Mode (`lapig_parcel_segmentation/`) |
+| Critério | 🖱️ Modo Interativo (`interactive_hq_sam/`) | ⚙️ Modo Automático (`lapig_parcel_segmentation/`) |
 | :--- | :--- | :--- |
 | **Público / Uso** | Operador humano, auditoria, refinamento fino de perímetros complexos | Processamento massivo de fazendas inteiras ou municípios |
 | **Intervenção** | **Human-in-the-Loop:** Cliques com pontos positivos (`+`) e negativos (`−`) | **Zero intervenção:** Execução autônoma ponta a ponta |
 | **Modelo de IA** | HQ-SAM ViT-H com amostragem pontual interativa e recortes inteligentes | SAMGeo ViT-H com segmentação automática em grade |
 | **Interface** | Web (Leaflet dark glassmorphism na porta `8088` com dock neon) | Linha de comando (CLI) ou script Python / Jupyter |
 | **Validação** | O operador valida visualmente e clica em "Confirmar Parcela" | Dominância zonal automática pelo MapBiomas (pastagem) |
+| **Formatos de Entrada** | Upload de `.kml`, `.kmz`, `.gpkg`, `.geojson`, `.zip` ou Lat/Lon | `.shp`, `.gpkg`, `.fgb`, `.parquet`, Asset GEE ou Lat/Lon |
 | **Saídas** | GeoJSON exportável pelo navegador com métricas em tempo real | Shapefiles duplos (`segmentacao_pura` e `pastagem_final`) |
 
 ---
@@ -120,17 +121,9 @@ O **sentinel2parcel** foi submetido a um teste de estresse e auditoria contínua
 | **Itapirapuã (GO)** | `GO-5211008-46C08C6235D7...` | 193,59 ha | 14 | 14 | 3,1 min | 6,47 GB |
 | **Luziânia (GO)** | `GO-5212501-89730760C68B...` | 167,76 ha | 16 | 17 | 6,4 min | 6,47 GB |
 | **Goiânia (GO)** | `GO-5208707-4045057E90C9...` | 70,28 ha | 10 | 11 | 7,1 min | 6,47 GB |
-> **💡 Nota sobre Hardware & Escalabilidade:**  
-> 1. **Vetorização Leve na CPU:** A vetorização em grafo planar consome apenas **0,6%** do tempo total, viabilizando simplificação rigorosa de cercas sem gargalo de processamento.
-> 2. **Viabilidade em GPUs Comerciais:** Com consumo médio de **6,4 GB de VRAM**, o pipeline roda com folga em GPUs de 8 GB a 16 GB (RTX 3060 12GB, RTX 4060 Ti 16GB, RTX 2080 Ti 11GB).
-> 3. **Fine-Tuning e Escala:** O gargalo dominante (86,2%) é a inferência ViT-H do SAMGeo. Para escala territorial (municípios e biomas), recomenda-se uso de GPUs corporativas (A100, H100) e pesos customizados para vegetação campestre tropical.
 
-### Gerenciamento Contínuo de Memória de Vídeo (Zero VRAM Leak)
-Para viabilizar execuções em lote sem risco de estouros de memória (*CUDA Out of Memory*):
-* A rotina [`clear_gpu_memory()`](lapig_parcel_segmentation/sam_segmenter.py) é acionada compulsória e automaticamente ao término de cada imóvel, deletando explicitamente tensores do `SamGeo`, invocando `gc.collect()`, liberando o *caching allocator* do PyTorch (`torch.cuda.empty_cache()`) e limpando blocos IPC (`torch.cuda.ipc_collect()`).
-* Isso garante que cada imóvel inicie seu ciclo com **0 MB de VRAM residual**, permitindo processar dezenas ou centenas de fazendas sequencialmente de forma ininterrupta.
-
-> Um dashboard interativo local de telemetria completa com gráficos dinâmicos e filtros por município pode ser gerado a qualquer momento via `python generate_dashboard.py` (arquivo `dashboard_benchmark.html`).
+> **💡 Gerenciamento Contínuo de Memória de Vídeo (Zero VRAM Leak):**  
+> A rotina [`clear_gpu_memory()`](lapig_parcel_segmentation/sam_segmenter.py) é acionada compulsória e automaticamente ao término de cada imóvel, deletando explicitamente tensores do `SamGeo`, invocando `gc.collect()`, liberando o *caching allocator* do PyTorch (`torch.cuda.empty_cache()`) e limpando blocos IPC (`torch.cuda.ipc_collect()`). Isso garante que cada imóvel inicie com **0 MB de VRAM residual**.
 
 ---
 
@@ -184,57 +177,230 @@ Para viabilizar execuções em lote sem risco de estouros de memória (*CUDA Out
  Shapefile: parcelas_segmentacao_pura_{ID}.shp      Shapefile: parcelas_finais_cercas_retas_{ID}.shp
 ```
 
-### Camadas de Saída Geradas:
-1. **`parcelas_segmentacao_pura_{ID}.shp`:** Delimitação de **todas** as parcelas e divisórias físicas identificadas dentro da propriedade, contendo colunas com percentual de sobreposição de uso, NDVI médio e classe.
-2. **`parcelas_finais_cercas_retas_{ID}.shp`:** Camada de parcelas produtivas com divisórias retilíneas, filtrada por dominância zonal do MapBiomas.
-3. **`nao_pastagem_auditoria.shp`:** Geometrias descartadas (lavouras, matas nativas, represas, infraestruturas) para fins de conferência técnica.
-4. **`relatorio_benchmark_hardware.json` & `.txt`:** Auditoria de hardware e consumo da GPU por propriedade.
-
 ---
 
-## 🚀 4. Instalação e Execução
+## 🚀 4. Instalação e Preparação do Ambiente
 
-### Pré-requisitos
-- Python 3.10 ou superior
-- GPU NVIDIA com suporte a CUDA (mínimo 8 GB VRAM recomendado)
-- Conta autenticada no Google Earth Engine (`earthengine authenticate`)
+### 4.1. Pré-requisitos de Sistema
+- **Sistema Operacional:** Linux (Ubuntu 22.04+) ou Windows 11 com WSL 2
+- **Python:** Versão 3.10 ou superior
+- **GPU NVIDIA:** Mínimo de 8 GB VRAM (recomendado 11 GB+, ex: RTX 2080 Ti, RTX 3060 12GB, RTX 4070+)
+- **Google Earth Engine:** Conta habilitada com autenticação ativa via CLI
 
-### Instalação das Dependências
+### 4.2. Instalação Passo a Passo
 
 ```bash
-# Clone o repositório privado
+# 1. Clone o repositório
 git clone https://github.com/vieiramesquita/sentinel2parcel.git
 cd sentinel2parcel
 
-# Crie e ative um ambiente virtual
+# 2. Crie e ative um ambiente virtual
 python -m venv venv
 source venv/bin/activate  # No Windows: venv\Scripts\activate
 
-# Instale os pacotes principais
+# 3. Instale PyTorch com suporte a CUDA 11.8 ou 12.1
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
-pip install segment-geospatial earthengine-api geopandas shapely rasterio matplotlib pandas duckdb psutil plotly
+
+# 4. Instale as bibliotecas geoespaciais e utilitárias
+pip install segment-geospatial earthengine-api geopandas shapely rasterio matplotlib pandas duckdb psutil plotly uvicorn fastapi pydantic pyproj pillow
+
+# 5. Autentique sua conta no Google Earth Engine
+earthengine authenticate
 ```
 
-### Execução via Linha de Comando (CLI)
-
+### 4.3. Download dos Pesos do Modelo SAM (ViT-H)
+O arquivo de pesos do modelo SAM ViT-H (`sam_vit_h_4b8939.pth` - ~2.5 GB) deve residir na pasta `models/`:
 ```bash
-# Processar um imóvel específico a partir de um GeoPackage local do CAR
-python -m lapig_parcel_segmentation.example_run \
-    --roi car_goias_area_imovel_epsg4674_hottest.gpkg \
-    --id-col cod_imovel \
-    --id-val GO-5204409-01D1AD1F9586415E9D46BF93115D27DF \
-    --year 2024 \
-    --straight-tol 8.0 \
-    --gee-project ee-vieiramesquita
+mkdir -p models
+# Download direto dos pesos oficiais do Meta AI:
+curl -o models/sam_vit_h_4b8939.pth https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
 ```
 
-### Execução Interativa via Jupyter Notebook
+---
 
-Abra o arquivo [`run_in_jupyter.ipynb`](run_in_jupyter.ipynb) para visualizar o fluxo passo a passo com mapas interativos do Folium/Geemap e gráficos de telemetria integrados.
+## ⚙️ 5. Como Usar o Modo Automático em Lote (`lapig_parcel_segmentation`)
 
-### Visualização do Dashboard
+O modo automático é executado via linha de comando (CLI) pelo script [`example_run.py`](lapig_parcel_segmentation/example_run.py) ou diretamente como biblioteca Python.
 
-Abra o arquivo `dashboard_benchmark.html` diretamente em qualquer navegador moderno (Chrome, Edge, Firefox) para explorar todas as propriedades processadas de forma interativa.
+### 5.1. Dicionário de Parâmetros da Linha de Comando
+
+| Argumento | Tipo | Padrão | Descrição |
+| :--- | :--- | :--- | :--- |
+| `--input` | `str` | `None` | Caminho do arquivo vetorial (`.shp`, `.gpkg`, `.fgb`, `.parquet`), asset do EE ou coordenada `"lat, lon"`. |
+| `--coord` | `str` | `None` | Coordenada geográfica `"lat, lon"` para busca e extração automática do CAR no Earth Engine. |
+| `--id-col` | `str` | `None` | Nome da coluna que identifica o imóvel no arquivo vetorial (ex: `cod_imovel`, `gid`, `id`). |
+| `--id-val` | `str` | `None` | Código do imóvel específico a ser processado (filtra o arquivo vetorial). |
+| `--all` | `flag` | `False` | Executa o processamento em lote sequencial para **todos** os imóveis do arquivo vetorial. |
+| `--limit` | `int` | `None` | Limita o número de imóveis a processar no lote (ideal para testes rápidos, ex: `--limit 2`). |
+| `--list-ids` | `flag` | `False` | Imprime todos os IDs disponíveis no arquivo vetorial e encerra a execução. |
+| `--year` | `int` | `2025` | Ano de referência para composição do mosaico Sentinel-2 e máscara MapBiomas. |
+| `--collection` | `str` | `10m` | Coleção MapBiomas: `10m` (Sentinel-2 Col 4) ou `30m` (Landsat Col 11). |
+| `--straight-tol` | `float` | `22.0` | Tolerância de retificação de cercas em metros (quanto maior, mais retas as divisórias). |
+| `--min_area` | `float` | `2.0` | Área mínima da parcela em hectares (polígonos menores são absorvidos pelos vizinhos). |
+| `--no-pasture-filter`| `flag`| `False` | Desabilita o filtro temático do MapBiomas e gera apenas a segmentação física pura de todos os talhões. |
+| `--output-dir` | `str` | `results` | Diretório raiz para salvar as subpastas e relatórios de cada imóvel. |
+| `--project` | `str` | `None` | ID do projeto Google Earth Engine (opcional; usa o padrão autenticado). |
+
+---
+
+### 5.2. Exemplos Práticos de Execução
+
+#### Cenário A: Processar um imóvel específico a partir de um GeoPackage do CAR
+```bash
+python -m lapig_parcel_segmentation.example_run \
+    --input "car_goias_area_imovel_epsg4674_hottest.gpkg" \
+    --id-col "cod_imovel" \
+    --id-val "GO-5204409-01D1AD1F9586415E9D46BF93115D27DF" \
+    --year 2025 \
+    --straight-tol 22.0
+```
+
+#### Cenário B: Processar uma propriedade apenas fornecendo sua coordenada GPS
+O pipeline busca a coordenada no catálogo oficial do CAR no Earth Engine, identifica o perímetro da fazenda e executa a segmentação completa:
+```bash
+python -m lapig_parcel_segmentation.example_run \
+    --coord "-16.1234, -50.5678" \
+    --year 2025 \
+    --min_area 2.0
+```
+
+#### Cenário C: Listar os imóveis presentes no seu arquivo antes de rodar
+```bash
+python -m lapig_parcel_segmentation.example_run \
+    --input "car_goias_area_imovel_epsg4674_hottest.gpkg" \
+    --id-col "cod_imovel" \
+    --list-ids
+```
+
+#### Cenário D: Execução em Lote para TODOS os imóveis com Shapefile Consolidado
+```bash
+python -m lapig_parcel_segmentation.example_run \
+    --input "car_goias_area_imovel_epsg4674_hottest.gpkg" \
+    --id-col "cod_imovel" \
+    --all
+```
+*Ao final do lote, o pipeline consolida automaticamente:*
+- `results/parcelas_todos_imoveis_consolidados.shp` (Todas as parcelas de pastagem de todas as fazendas unificadas).
+- `results/parcelas_todos_imoveis_segmentacao_pura.shp` (Segmentação física pura de todos os imóveis).
+- `results/relatorio_benchmark_hardware_lote.json` e `.txt` (Resumo consolidado de telemetria de hardware).
+
+#### Cenário E: Rodar em Modo Segmentação Pura (Sem descarte de matas/lavouras)
+Útil para quem deseja mapear todos os talhões da fazenda independente do uso da terra:
+```bash
+python -m lapig_parcel_segmentation.example_run \
+    --input "car_goias_area_imovel_epsg4674_hottest.gpkg" \
+    --id-col "cod_imovel" \
+    --id-val "GO-5204409-01D1AD1F9586415E9D46BF93115D27DF" \
+    --no-pasture-filter
+```
+
+---
+
+### 5.3. Como Utilizar Diretamente no Código Python
+
+```python
+from lapig_parcel_segmentation import run_analysis_lapig
+
+# Executa o pipeline completo programaticamente
+gdf_pasto, shp_pasto, gdf_puro, shp_puro = run_analysis_lapig(
+    input_target="car_goias_area_imovel_epsg4674_hottest.gpkg",
+    id_column="cod_imovel",
+    id_value="GO-5204409-01D1AD1F9586415E9D46BF93115D27DF",
+    year=2025,
+    min_area_ha=2.0,
+    straight_tol=22.0,
+    filter_by_pasture=True,
+    enable_benchmark=True
+)
+
+print(f"Parcelas de pasto confirmadas: {len(gdf_pasto)}")
+print(f"Arquivo gerado: {shp_pasto}")
+```
+
+---
+
+## 🖱️ 6. Como Usar o Modo Interativo Human-in-the-Loop (`interactive_hq_sam`)
+
+O modo interativo foi desenhado para **operações assistidas por inteligência visual**. É ideal para operadores humanos auditarem divisórias de pastagem, corrigirem cercas duvidosas ou desenharem talhões complexos com resposta instantânea da IA.
+
+### 6.1. Inicialização do Servidor Local
+
+No terminal do projeto:
+```bash
+python interactive_hq_sam/run_interactive_app.py --port 8088
+```
+Acesse no navegador:
+👉 **`http://localhost:8088/`**
+
+---
+
+### 6.2. Fluxo de Trabalho Passo a Passo
+
+```
+  1. Carregar ROI          2. Amostragem           3. Validação          4. Topologia Estanque
+┌──────────────────┐    ┌──────────────────┐    ┌─────────────────┐    ┌────────────────────────┐
+│ - Upload KML/KMZ │    │ - Clique Pos (+) │    │ - Conferir Área │    │ - Regularizar Cercas   │
+│ - Código CAR     │ -> │ - Clique Neg (-) │ -> │ - "Confirmar    │ -> │   (Watertight Graph)   │
+│ - Lat / Lon      │    │   (Bisseção Per- │    │    Parcela"     │    │ - "Exportar GeoJSON"   │
+│ - Demo Pre-sets  │    │    pendicular)   │    │                 │    │                        │
+└──────────────────┘    └──────────────────┘    └─────────────────┘    └────────────────────────┘
+```
+
+1. **Carregar a Região de Interesse (ROI):**
+   - **Upload de Arquivo Vetorial:** Arraste e solte ou selecione arquivos `.kml`, `.kmz`, `.gpkg`, `.geojson` ou `.zip` (Shapefile). Geometrias com altitude 3D são automaticamente sanitizadas em 2D.
+   - **Código do CAR:** Digite o código do imóvel para download em tempo real do mosaico multitemporal Sentinel-2.
+   - **Coordenada Lat/Lon:** Forneça a latitude e longitude central da fazenda.
+   - **Fazendas Pré-carregadas:** Escolha uma das propriedades demonstrativas no menu lateral.
+
+2. **Amostragem com Pontos Positivos e Negativos:**
+   - **Ponto Positivo (`+` - Verde):** Clique no interior do pasto ou talhão para segmentar a feição desejada. Múltiplos pontos positivos unem áreas contíguas.
+   - **Ponto Negativo (`−` - Vermelho):** Clique sobre represas, sedes, áreas florestais ou pastos vizinhos. O algoritmo calcula a **bisseção perpendicular** entre a semente positiva e a negativa, seccionando a divisa instantaneamente.
+
+3. **Confirmação da Parcela:**
+   - O contorno tracejado neon ciano exibe a proposta do modelo com cálculo de área em hectares (`ha`) e pontuação de confiança.
+   - Clique no botão **`Confirmar Parcela`** no dock inferior para salvar o polígono no cadastro da sessão.
+
+4. **Refinamento e Edição de Parcelas Já Salvas:**
+   - Para ajustar uma parcela já confirmada, clique sobre ela no mapa ou na lista lateral. Novos cliques positivos e negativos refinarão imediatamente sua geometria.
+
+5. **Regularização Topológica e Exportação:**
+   - Clique no botão **`⚡ Regularizar Topologia (Watertight)`** para converter todas as parcelas salvas em um grafo planar com arestas compartilhadas e retificadas de mourão a mourão (0% de sobreposição garantido).
+   - Clique em **`Exportar GeoJSON`** para baixar o arquivo cadastral pronto para importação no QGIS ou ArcGIS.
+
+---
+
+## 📂 7. Estrutura das Pastas e Dicionário de Atributos
+
+### Estrutura de Arquivos Gerada por Imóvel em `results/{ID}/`:
+```
+results/GO-5204409-01D1AD1F9586415E9D46BF93115D27DF/
+├── parcelas_segmentacao_pura_GO-5204409...shp      # Todos os talhões físicos no CAR
+├── parcelas_finais_cercas_retas_GO-5204409...shp   # Apenas parcelas de pastagem validadas
+├── nao_pastagem_auditoria.shp                      # Áreas descartadas (matas, lavouras, água)
+├── s2_ndvi_rgb.tif                                 # Mosaico espectral Sentinel-2 CS+
+├── relatorio_benchmark_hardware.json               # Telemetria estruturada de hardware
+└── relatorio_benchmark_hardware.txt                # Relatório legível de consumo de VRAM e CPU
+```
+
+### Dicionário de Atributos das Camadas Vetoriais:
+
+| Campo | Tipo | Descrição |
+| :--- | :--- | :--- |
+| `id_parcela` | `Integer` | Identificador sequencial único da parcela dentro do imóvel. |
+| `cod_car` | `String` | Código identificador oficial do imóvel rural no CAR. |
+| `area_ha` | `Float` | Área calculada da parcela em hectares (`ha`). |
+| `perim_m` | `Float` | Perímetro do polígono da parcela em metros. |
+| `pasto_cov` | `Float` | Percentual de cobertura de pastagem da parcela segundo o MapBiomas (0.00 a 1.00). |
+| `ndvi_med` | `Float` | Mediana do NDVI espectral da parcela no período de análise. |
+| `is_pasto` | `Integer` | `1` se aprovado como pastagem (dominância $\ge$ 35%), `0` se classe alternativa. |
+| `classe` | `String` | Descrição textual da classe: `'Pasto'` ou `'Outros (Mata/APP/Lavoura)'`. |
+
+---
+
+## 🛡️ 8. Segurança, Governança & Boas Práticas
+
+- **Proteção de Informações Sensíveis:** O repositório conta com uma skill global de auditoria de segurança preventiva (`git-sensitive-guard`) em `~/.gemini/config/skills/git-sensitive-guard/`, que bloqueia automaticamente o envio acidental de arquivos confidenciais, artigos acadêmicos locais (`paper/`), credenciais (`.env`, chaves de API, certificados) ou skills proprietárias.
+- **Registro Cumulativo de Decisões:** Todas as decisões arquiteturais, padrões terminológicos e regras de projeto estão documentadas no arquivo [PROJECT_DECISIONS.md](PROJECT_DECISIONS.md).
 
 ---
 
