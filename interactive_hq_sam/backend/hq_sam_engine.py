@@ -17,8 +17,9 @@ import numpy as np
 import rasterio
 from rasterio.features import shapes
 from rasterio.warp import transform_bounds, transform
-from shapely.geometry import shape, mapping, MultiPolygon, Polygon
-from shapely.ops import transform as shp_transform
+import shapely
+from shapely.geometry import shape, mapping, MultiPolygon, Polygon, Point, LineString, MultiLineString
+from shapely.ops import transform as shp_transform, unary_union, polygonize, linemerge
 import pyproj
 from PIL import Image
 
@@ -298,7 +299,9 @@ class HQSamEngine:
                     roi_ee = ee.Feature(ee_geom)
                     buf_meters = int(buffer_m)
                 elif hasattr(roi_geometry_or_point, '__geo_interface__'):
-                    ee_geom = ee.Geometry(roi_geometry_or_point.__geo_interface__)
+                    import shapely.ops
+                    geom_2d = shapely.ops.transform(lambda x, y, *args: (x, y), roi_geometry_or_point)
+                    ee_geom = ee.Geometry(geom_2d.__geo_interface__)
                     roi_ee = ee.Feature(ee_geom)
                     buf_meters = max(200, int(buffer_m))
                 elif isinstance(roi_geometry_or_point, dict):
@@ -595,20 +598,41 @@ class HQSamEngine:
         project_to_wgs84 = pyproj.Transformer.from_crs(src_crs, "EPSG:4326", always_xy=True).transform
         project_to_src = pyproj.Transformer.from_crs("EPSG:4326", src_crs, always_xy=True).transform
 
-        # Ponto de referência e lista de pontos positivos para isolar a feição do piquete
-        from shapely.geometry import Point
+        # Ponto de referência e lista de pontos positivos e negativos para isolar e seccionar a feição do piquete
         pos_points = [p for p in points if int(p.get('label', 1)) == 1]
+        neg_points = [p for p in points if int(p.get('label', 1)) == 0]
         
         src_pos_pts = []
         for p in pos_points:
             rx, ry = project_to_src(p['lon'], p['lat'])
             src_pos_pts.append(Point(rx, ry))
 
+        src_neg_pts = []
+        for p in neg_points:
+            rx, ry = project_to_src(p['lon'], p['lat'])
+            src_neg_pts.append(Point(rx, ry))
+
         if src_pos_pts:
             target_pt = src_pos_pts[0]
         else:
             rx, ry = project_to_src(points[0]['lon'], points[0]['lat'])
             target_pt = Point(rx, ry)
+
+        # Prepara união dos piquetes já salvos no CRS do raster para prevenção de sobreposição em tempo real
+        saved_src_union = None
+        if self.saved_paddocks:
+            saved_src_geoms = []
+            for sp in self.saved_paddocks:
+                if sp.get('geojson'):
+                    try:
+                        g_wgs = shape(sp['geojson'])
+                        g_src = shp_transform(project_to_src, g_wgs)
+                        if g_src.is_valid and not g_src.is_empty:
+                            saved_src_geoms.append(g_src)
+                    except Exception:
+                        pass
+            if saved_src_geoms:
+                saved_src_union = unary_union(saved_src_geoms)
 
         results = []
         for i in range(len(masks)):
@@ -667,12 +691,43 @@ class HQSamEngine:
                         best_part = part
                 selected_poly = best_part or parts[0]
 
+            # 1. Corte por Hiperplano Bissetor / Mediatriz (Eq. 1 do artigo SBSR)
+            # Quando há ponto negativo, traça o hiperplano normal no ponto médio e retém o semiplano positivo
+            if src_neg_pts and src_pos_pts:
+                for neg_pt in src_neg_pts:
+                    if selected_poly.contains(neg_pt) or selected_poly.distance(neg_pt) < 15.0:
+                        closest_pos = min(src_pos_pts, key=lambda pt: pt.distance(neg_pt))
+                        selected_poly = self._clip_polygon_by_bisector(selected_poly, closest_pos, neg_pt)
+
+            # 2. Prevenção de Sobreposição em Tempo Real com Piquetes já Existentes (0% Overlap)
+            if saved_src_union is not None and selected_poly.intersects(saved_src_union):
+                diff = selected_poly.difference(saved_src_union)
+                if not diff.is_empty:
+                    if isinstance(diff, MultiPolygon):
+                        # Retém a componente mais próxima ou que contém os pontos positivos
+                        best_part = None
+                        max_c = -1
+                        min_d = float('inf')
+                        for part in diff.geoms:
+                            c = sum(1 for pt in src_pos_pts if part.contains(pt) or part.touches(pt))
+                            d = part.distance(target_pt)
+                            if c > max_c:
+                                max_c = c
+                                min_d = d
+                                best_part = part
+                            elif c == max_c and d < min_d:
+                                min_d = d
+                                best_part = part
+                        diff = best_part or diff.geoms[0]
+                    if isinstance(diff, Polygon) and diff.area > 0:
+                        selected_poly = Polygon(diff.exterior)
+
             # Calcula área em hectares
             area_ha = 0.0
             if src_crs.is_projected:
-                area_ha = selected_poly.area / 10000.0
+                area_ha = round(selected_poly.area / 10000.0, 2)
             else:
-                area_ha = selected_poly.area * (111320 ** 2) / 10000.0
+                area_ha = self._calc_area_ha(selected_poly, is_wgs84=True)
 
             # Converte para WGS84 GeoJSON
             poly_wgs84 = shp_transform(project_to_wgs84, selected_poly)
@@ -682,7 +737,7 @@ class HQSamEngine:
             results.append({
                 "mask_index": i,
                 "confidence_score": round(score * 100, 2),
-                "area_ha": round(area_ha, 2),
+                "area_ha": area_ha,
                 "geojson": mapping(poly_wgs84_simplified)
             })
 
@@ -691,16 +746,97 @@ class HQSamEngine:
         self.last_candidate_masks = results
         return results
 
-    def save_paddock(self, paddock_data):
-        """Salva um piquete confirmado na coleção de piquetes do usuário."""
+    @staticmethod
+    def _clip_polygon_by_bisector(polygon, pos_pt, neg_pt):
+        """
+        Corta o polígono pelo hiperplano mediatriz entre pos_pt e neg_pt (Eq. 1 do artigo).
+        Retém a porção no semiplano que contém pos_pt.
+        """
+        p_pos = np.array([pos_pt.x, pos_pt.y])
+        p_neg = np.array([neg_pt.x, neg_pt.y])
+        m = (p_pos + p_neg) / 2.0
+        n = p_pos - p_neg
+        dist = np.linalg.norm(n)
+        if dist < 1e-6:
+            return polygon
+
+        u_perp = np.array([-n[1], n[0]]) / dist
+        u_norm = n / dist
+
+        minx, miny, maxx, maxy = polygon.bounds
+        diag = np.sqrt((maxx - minx) ** 2 + (maxy - miny) ** 2) + 1000.0
+
+        pt_left = m - u_perp * diag
+        pt_right = m + u_perp * diag
+        pt_top_right = pt_right + u_norm * diag
+        pt_top_left = pt_left + u_norm * diag
+
+        half_plane = Polygon([pt_left, pt_right, pt_top_right, pt_top_left])
+        if not polygon.intersects(half_plane):
+            return polygon
+
+        clipped = polygon.intersection(half_plane)
+        if clipped.is_empty:
+            return polygon
+
+        if isinstance(clipped, MultiPolygon):
+            for comp in clipped.geoms:
+                if comp.contains(pos_pt) or comp.touches(pos_pt):
+                    return comp
+            return min(clipped.geoms, key=lambda c: c.distance(pos_pt))
+        elif isinstance(clipped, Polygon):
+            return clipped
+        return polygon
+
+    @staticmethod
+    def _calc_area_ha(geom, is_wgs84=True):
+        """Calcula a área precisa em hectares."""
+        if not is_wgs84:
+            return round(geom.area / 10000.0, 2)
+        c_lat = (geom.bounds[1] + geom.bounds[3]) / 2.0
+        cos_lat = math.cos(math.radians(c_lat))
+        area_m2 = geom.area * (111320.0 * cos_lat) * 110540.0
+        return round(area_m2 / 10000.0, 2)
+
+    def save_paddock(self, paddock_data, prevent_overlap=True):
+        """Salva um piquete confirmado garantindo estanqueidade topológica (0% de sobreposição com outros)."""
         pid = paddock_data.get('id') or str(uuid.uuid4())[:8]
         name = paddock_data.get('name') or f"Piquete {len(self.saved_paddocks) + 1}"
+        
+        poly_shp = shape(paddock_data.get('geojson'))
+        if not poly_shp.is_valid:
+            poly_shp = poly_shp.buffer(0)
+
+        # Prevenção rigorosa de sobreposição mútua
+        if prevent_overlap and self.saved_paddocks:
+            saved_geoms = []
+            for sp in self.saved_paddocks:
+                if sp.get('geojson'):
+                    try:
+                        g = shape(sp['geojson'])
+                        if g.is_valid and not g.is_empty:
+                            saved_geoms.append(g)
+                    except Exception:
+                        pass
+            if saved_geoms:
+                saved_union = unary_union(saved_geoms)
+                if poly_shp.intersects(saved_union):
+                    diff = poly_shp.difference(saved_union)
+                    if not diff.is_empty:
+                        if isinstance(diff, MultiPolygon):
+                            diff = max(diff.geoms, key=lambda g: g.area)
+                        if isinstance(diff, Polygon) and diff.area > 0:
+                            poly_shp = Polygon(diff.exterior)
+
+        poly_shp = poly_shp.simplify(0.00002, preserve_topology=True)
+        area_ha = self._calc_area_ha(poly_shp, is_wgs84=True)
+
         record = {
             "id": pid,
             "name": name,
-            "area_ha": paddock_data.get('area_ha', 0.0),
+            "area_ha": area_ha,
             "confidence_score": paddock_data.get('confidence_score', 100.0),
-            "geojson": paddock_data.get('geojson'),
+            "geojson": mapping(poly_shp),
             "points": paddock_data.get('points', [])
         }
         self.saved_paddocks.append(record)
@@ -708,21 +844,129 @@ class HQSamEngine:
         return record
 
     def update_paddock(self, paddock_id, paddock_data):
-        """Atualiza a geometria e métricas de um piquete existente."""
+        """Atualiza a geometria e métricas de um piquete existente garantindo topologia limpa."""
         for p in self.saved_paddocks:
             if p['id'] == paddock_id:
                 if 'name' in paddock_data and paddock_data['name']:
                     p['name'] = paddock_data['name']
-                if 'area_ha' in paddock_data:
-                    p['area_ha'] = paddock_data['area_ha']
                 if 'confidence_score' in paddock_data:
                     p['confidence_score'] = paddock_data['confidence_score']
-                if 'geojson' in paddock_data and paddock_data['geojson']:
-                    p['geojson'] = paddock_data['geojson']
                 if 'points' in paddock_data:
                     p['points'] = paddock_data['points']
+                if 'geojson' in paddock_data and paddock_data['geojson']:
+                    poly_shp = shape(paddock_data['geojson'])
+                    if not poly_shp.is_valid:
+                        poly_shp = poly_shp.buffer(0)
+                    
+                    # Subtrai outros piquetes (exceto o próprio)
+                    other_geoms = [shape(sp['geojson']) for sp in self.saved_paddocks if sp['id'] != paddock_id and sp.get('geojson')]
+                    if other_geoms:
+                        other_union = unary_union(other_geoms)
+                        if poly_shp.intersects(other_union):
+                            diff = poly_shp.difference(other_union)
+                            if not diff.is_empty:
+                                if isinstance(diff, MultiPolygon):
+                                    diff = max(diff.geoms, key=lambda g: g.area)
+                                if isinstance(diff, Polygon):
+                                    poly_shp = Polygon(diff.exterior)
+
+                    poly_shp = poly_shp.simplify(0.00002, preserve_topology=True)
+                    p['geojson'] = mapping(poly_shp)
+                    p['area_ha'] = self._calc_area_ha(poly_shp, is_wgs84=True)
                 return p
         raise ValueError(f"Piquete {paddock_id} não encontrado.")
+
+    def regularize_paddocks_topology(self, straight_tol=18.0):
+        """
+        Reconstrói todos os piquetes da sessão em um Grafo Planar Estanque (Watertight Planar Graph).
+        Retifica cercas comuns via distância de Hausdorff, elimina frestas/slivers e garante 0% de sobreposições mútuas.
+        """
+        if not self.saved_paddocks:
+            return {"status": "no_paddocks", "count": 0, "paddocks": []}
+
+        if len(self.saved_paddocks) == 1:
+            p = shape(self.saved_paddocks[0]['geojson'])
+            p_clean = p.buffer(0).simplify(0.00003, preserve_topology=True)
+            self.saved_paddocks[0]['geojson'] = mapping(p_clean)
+            self.saved_paddocks[0]['area_ha'] = self._calc_area_ha(p_clean, is_wgs84=True)
+            return {"status": "success", "count": 1, "paddocks": self.saved_paddocks, "total_area_ha": self.saved_paddocks[0]['area_ha']}
+
+        # 1. Carrega geometrias em GeoDataFrame
+        records = []
+        for p in self.saved_paddocks:
+            geom = shape(p['geojson'])
+            if not geom.is_valid:
+                geom = geom.buffer(0)
+            records.append({'id': p['id'], 'name': p['name'], 'score': p.get('confidence_score', 100.0), 'geometry': geom})
+
+        gdf = gpd.GeoDataFrame(records, crs="EPSG:4326")
+        utm_crs = gdf.estimate_utm_crs()
+        gdf_utm = gdf.to_crs(utm_crs)
+
+        # 2. Decomposição em Grafo Planar
+        boundaries = [poly.boundary for poly in gdf_utm.geometry if poly.is_valid and not poly.is_empty]
+        noded = shapely.node(unary_union(boundaries))
+        merged = linemerge(noded)
+        lines = merged.geoms if isinstance(merged, MultiLineString) else [merged]
+
+        # 3. Retificação dos Lances de Cerca Compartilhados
+        straight_lines = []
+        for line in lines:
+            if line.length < 5.0:
+                continue
+            coords = np.array(line.coords)
+            chord = LineString([coords[0], coords[-1]])
+            h_dist = line.hausdorff_distance(chord)
+            if h_dist <= straight_tol:
+                straight_lines.append(chord)
+            else:
+                straight_lines.append(line.simplify(straight_tol * 0.75, preserve_topology=True))
+
+        # 4. Reconstrução Planar (Polygonize)
+        noded_straight = shapely.node(unary_union(straight_lines))
+        reconstructed = list(polygonize(noded_straight))
+
+        # 5. Atribuição de Células aos Piquetes Originais
+        assigned_cells = {p['id']: [] for p in self.saved_paddocks}
+        for cell in reconstructed:
+            if cell.area < 100.0:  # Descarta micro-ruídos menores que 100m²
+                continue
+            best_id = None
+            max_inter = 0.0
+            for idx, row in gdf_utm.iterrows():
+                inter_area = cell.intersection(row.geometry).area
+                if inter_area > max_inter:
+                    max_inter = inter_area
+                    best_id = row['id']
+            if best_id and max_inter > (cell.area * 0.2):
+                assigned_cells[best_id].append(cell)
+
+        # 6. Atualização dos Piquetes Salvos
+        updated_paddocks = []
+        for p in self.saved_paddocks:
+            pid = p['id']
+            cells = assigned_cells.get(pid, [])
+            if cells:
+                u_poly = unary_union(cells)
+                if isinstance(u_poly, MultiPolygon):
+                    u_poly = max(u_poly.geoms, key=lambda g: g.area)
+                if isinstance(u_poly, Polygon):
+                    u_poly = Polygon(u_poly.exterior)
+                
+                # Converte de volta para WGS84
+                gdf_single = gpd.GeoDataFrame([{'geometry': u_poly}], crs=utm_crs).to_crs("EPSG:4326")
+                geom_wgs84 = gdf_single.geometry.iloc[0]
+                p['geojson'] = mapping(geom_wgs84)
+                p['area_ha'] = round(u_poly.area / 10000.0, 2)
+            updated_paddocks.append(p)
+
+        self.saved_paddocks = updated_paddocks
+        return {
+            "status": "success",
+            "count": len(self.saved_paddocks),
+            "paddocks": self.saved_paddocks,
+            "total_area_ha": round(sum(p['area_ha'] for p in self.saved_paddocks), 2)
+        }
 
     def delete_paddock(self, paddock_id):
         """Remove um piquete por ID."""
@@ -738,3 +982,4 @@ class HQSamEngine:
         self.active_roi_id = None
         self.overlay_png_path = None
         self.car_geojson = None
+

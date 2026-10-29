@@ -117,8 +117,8 @@ def load_car_id(req: CarIdRequest):
 async def upload_roi(file: UploadFile = File(...)):
     try:
         ext = os.path.splitext(file.filename)[1].lower()
-        if ext not in [".gpkg", ".geojson", ".json", ".zip"]:
-            raise HTTPException(status_code=400, detail="Formato não suportado. Use .gpkg, .geojson ou .zip com Shapefile.")
+        if ext not in [".kml", ".kmz", ".gpkg", ".geojson", ".json", ".zip", ".shp"]:
+            raise HTTPException(status_code=400, detail="Formato não suportado. Use .kml, .kmz, .gpkg, .geojson ou .zip com Shapefile.")
         
         with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
             content = await file.read()
@@ -126,12 +126,75 @@ async def upload_roi(file: UploadFile = File(...)):
             tmp_path = tmp.name
 
         import geopandas as gpd
-        gdf = gpd.read_file(tmp_path)
-        if gdf.empty:
-            raise ValueError("O arquivo vetorial enviado não possui geometrias.")
+        import shapely
+        from shapely.ops import unary_union
 
+        target_path = tmp_path
+        extracted_temp_dir = None
+
+        # 1. Tratamento específico para KMZ (arquivo compactado com KML interno)
+        if ext == ".kmz":
+            with zipfile.ZipFile(tmp_path, 'r') as z:
+                kml_names = [f for f in z.namelist() if f.lower().endswith('.kml')]
+                if not kml_names:
+                    raise ValueError("Nenhum arquivo .kml encontrado dentro do pacote KMZ enviado.")
+                target_kml = "doc.kml" if "doc.kml" in kml_names else kml_names[0]
+                extracted_temp_dir = tempfile.mkdtemp()
+                target_path = z.extract(target_kml, extracted_temp_dir)
+                ext = ".kml"
+
+        # 2. Leitura do arquivo com GeoPandas
+        if ext == ".kml":
+            try:
+                import pyogrio
+                layers = pyogrio.list_layers(target_path)
+                gdfs = []
+                for layer_name in layers[:, 0]:
+                    try:
+                        sub = gpd.read_file(target_path, layer=layer_name)
+                        if not sub.empty and any(sub.geometry.notnull()):
+                            gdfs.append(sub)
+                    except Exception:
+                        pass
+                if gdfs:
+                    import pandas as pd
+                    gdf = pd.concat(gdfs, ignore_index=True)
+                    gdf = gpd.GeoDataFrame(gdf, crs=gdfs[0].crs or "EPSG:4326")
+                else:
+                    gdf = gpd.read_file(target_path)
+            except Exception:
+                gdf = gpd.read_file(target_path)
+        else:
+            gdf = gpd.read_file(target_path)
+
+        if gdf.empty:
+            raise ValueError("O arquivo vetorial enviado não possui feições ou geometrias válidas.")
+
+        # Garante projeção WGS84 (padrão de KML/KMZ e GeoJSON)
+        if gdf.crs is None:
+            gdf = gdf.set_crs("EPSG:4326")
         gdf_4326 = gdf.to_crs("EPSG:4326")
-        bounds = gdf_4326.total_bounds
+        gdf_4326 = gdf_4326[gdf_4326.geometry.notnull() & ~gdf_4326.geometry.is_empty]
+
+        if gdf_4326.empty:
+            raise ValueError("Nenhuma geometria válida encontrada no arquivo.")
+
+        # Unifica geometrias (suporta múltiplos placemarks/talhões dentro do KML/KMZ)
+        union_geom = unary_union(list(gdf_4326.geometry))
+        if union_geom.geom_type in ['LineString', 'MultiLineString']:
+            union_geom = union_geom.convex_hull
+        elif union_geom.geom_type == 'GeometryCollection':
+            polys = [g for g in union_geom.geoms if g.geom_type in ['Polygon', 'MultiPolygon']]
+            if polys:
+                union_geom = unary_union(polys)
+            else:
+                union_geom = union_geom.convex_hull
+
+        # Força geometria 2D (remove dimensão Z caso venha de KML/KMZ para total compatibilidade com GEE/GeoJSON)
+        import shapely.ops
+        union_geom = shapely.ops.transform(lambda x, y, *args: (x, y), union_geom)
+
+        bounds = union_geom.bounds
         c_lon = (bounds[0] + bounds[2]) / 2
         c_lat = (bounds[1] + bounds[3]) / 2
 
@@ -148,13 +211,17 @@ async def upload_roi(file: UploadFile = File(...)):
         engine.clear_session()
         engine.active_roi_id = f"upload_{os.path.basename(file.filename)[:12]}"
         engine.active_roi_name = file.filename
-        engine.car_geojson = json.loads(gdf_4326.to_json())['features'][0]
+        engine.car_geojson = {
+            "type": "Feature",
+            "properties": {"name": file.filename},
+            "geometry": shapely.geometry.mapping(union_geom)
+        }
 
         engine.set_progress(5, "Processando arquivo vetorial...", f"Arquivo: {file.filename} (calculando extensão territorial)...")
         cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cache")
         os.makedirs(cache_dir, exist_ok=True)
         tif_path = os.path.join(cache_dir, f"s2_{engine.active_roi_id}.tif")
-        geom_shp = gdf_4326.geometry.iloc[0]
+        geom_shp = union_geom
         engine.acquire_sentinel2_image(
             roi_geometry_or_point=geom_shp,
             output_tif_path=tif_path,
@@ -177,7 +244,6 @@ async def upload_roi(file: UploadFile = File(...)):
             engine.sam.set_image(tif_path)
 
         engine.set_progress(100, "Concluído!", "Vetor e Sentinel-2 carregados com sucesso!", status="done")
-        os.remove(tmp_path)
 
         return {
             "roi_id": engine.active_roi_id,
@@ -189,6 +255,15 @@ async def upload_roi(file: UploadFile = File(...)):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+        if extracted_temp_dir and os.path.exists(extracted_temp_dir):
+            import shutil
+            shutil.rmtree(extracted_temp_dir, ignore_errors=True)
 
 @app.get("/api/overlay")
 def get_overlay_image():
@@ -246,8 +321,22 @@ def get_paddocks():
         "count": len(engine.saved_paddocks)
     }
 
+@app.post("/api/paddocks/regularize")
+def regularize_paddocks(straight_tol: float = 18.0):
+    try:
+        res = engine.regularize_paddocks_topology(straight_tol=straight_tol)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @app.get("/api/export/geojson")
-def export_geojson():
+def export_geojson(regularize: bool = True):
+    if regularize and len(engine.saved_paddocks) > 1:
+        try:
+            engine.regularize_paddocks_topology()
+        except Exception as e:
+            print(f"Aviso na regularização automática antes de exportar: {e}")
+
     features = []
     for p in engine.saved_paddocks:
         features.append({

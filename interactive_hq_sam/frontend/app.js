@@ -91,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
         paddocksStatArea: document.getElementById('paddocks-stat-area'),
         paddocksStatAvg: document.getElementById('paddocks-stat-avg'),
         paddocksList: document.getElementById('paddocks-list'),
+        btnRegularizePaddocks: document.getElementById('btn-regularize-paddocks'),
         btnClearAllPaddocks: document.getElementById('btn-clear-all-paddocks'),
 
         // Loading Overlay & Progress Bar
@@ -1063,6 +1064,47 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Erro ao limpar piquetes:", err);
         }
     });
+
+    if (dom.btnRegularizePaddocks) {
+        dom.btnRegularizePaddocks.addEventListener('click', async () => {
+            if (state.savedPaddocks.length === 0) {
+                alert("Nenhum piquete para regularizar.");
+                return;
+            }
+            try {
+                dom.btnRegularizePaddocks.disabled = true;
+                dom.btnRegularizePaddocks.innerHTML = '<i data-lucide="loader"></i> <span>Regularizando...</span>';
+                if (window.lucide) lucide.createIcons();
+
+                const res = await fetch('/api/paddocks/regularize', { method: 'POST' });
+                const data = await res.json();
+
+                if (data.status === 'success' && data.paddocks) {
+                    // Limpa camadas anteriores no mapa
+                    state.paddocksLayer.clearLayers();
+
+                    // Reassocia e redesenha os piquetes atualizados
+                    state.savedPaddocks = data.paddocks.map(p => {
+                        const newLayer = createPaddockMapLayer(p);
+                        return { ...p, layer: newLayer };
+                    });
+
+                    updatePaddocksStats();
+                    renderPaddocksList();
+                    alert(`Topologia estanque regularizada com sucesso via Grafo Planar!\n0% de sobreposições em ${data.count} piquetes.`);
+                } else {
+                    alert("Aviso na regularização de topologia.");
+                }
+            } catch (err) {
+                console.error("Erro na regularização:", err);
+                alert("Erro ao regularizar topologia: " + err.message);
+            } finally {
+                dom.btnRegularizePaddocks.disabled = false;
+                dom.btnRegularizePaddocks.innerHTML = '<i data-lucide="shield-check"></i> <span>Regularizar Topologia (Grafo Planar)</span>';
+                if (window.lucide) lucide.createIcons();
+            }
+        });
+    }
 
     // =========================================================================
     // Exportação em GeoJSON

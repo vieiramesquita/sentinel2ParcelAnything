@@ -39,6 +39,26 @@ scratch/
 .tempmediaStorage/
 temp_*.tif
 *.tif.aux.xml
+interactive_hq_sam/cache/*
+!interactive_hq_sam/cache/.gitkeep
+
+# Scientific Paper (Keep private / off GitHub)
+paper/
+paper_*.zip
+*.zip
+!example/*.zip
+
+# LaTeX build artifacts & temporary files
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.synctex.gz
+page_*.png
+texput.*
+template_sbsr.*
+
 
 # IDE
 .vscode/
@@ -50,4 +70,5 @@ Thumbs.db
 
 # Standalone Public Demo Repository
 sentinel2parcel_test/
+
 
