@@ -69,6 +69,11 @@ template_sbsr.*
 .DS_Store
 Thumbs.db
 
+# Internal Agent Context & Governance (Keep private / off GitHub)
+PROJECT_DECISIONS.md
+HANDOFF_*.md
+*.handoff.md
+
 # Standalone Public Demo Repository
 sentinel2parcel_test/
 

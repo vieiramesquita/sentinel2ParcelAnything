@@ -397,13 +397,6 @@ results/GO-5204409-01D1AD1F9586415E9D46BF93115D27DF/
 
 ---
 
-## 🛡️ 8. Segurança, Governança & Boas Práticas
-
-- **Proteção de Informações Sensíveis:** O repositório conta com uma skill global de auditoria de segurança preventiva (`git-sensitive-guard`) em `~/.gemini/config/skills/git-sensitive-guard/`, que bloqueia automaticamente o envio acidental de arquivos confidenciais, artigos acadêmicos locais (`paper/`), credenciais (`.env`, chaves de API, certificados) ou skills proprietárias.
-- **Registro Cumulativo de Decisões:** Todas as decisões arquiteturais, padrões terminológicos e regras de projeto estão documentadas no arquivo [PROJECT_DECISIONS.md](PROJECT_DECISIONS.md).
-
----
-
 ## 👥 Créditos & Equipe
 
 * **Laboratório de Processamento de Imagens e Geoprocessamento (LAPIG)** — Universidade Federal de Goiás (UFG)
