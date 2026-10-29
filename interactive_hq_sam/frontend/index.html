@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -24,7 +24,7 @@
                 </div>
                 <div>
                     <h1 class="brand-title">ParcelAnything <span class="mode-pill">Interactive Mode</span> <span class="tag-pill">LAPIG Lab</span></h1>
-                    <p class="brand-subtitle">Segmentação Cadastral por Ponto no Sentinel-2 com Auxílio Google/ESRI</p>
+                    <p class="brand-subtitle">Point-Prompted Cadastral Segmentation on Sentinel-2 with Google/ESRI Overlays</p>
                 </div>
             </div>
 
@@ -35,16 +35,16 @@
                     <span id="gpu-text">NVIDIA RTX 2080 Ti • ViT-H HQ</span>
                 </div>
                 <div class="metric-pill">
-                    <span class="metric-label">Parcelas:</span>
+                    <span class="metric-label">Parcels:</span>
                     <span class="metric-val" id="header-paddocks-count">0</span>
                 </div>
                 <div class="metric-pill">
-                    <span class="metric-label">Área Mapeada:</span>
+                    <span class="metric-label">Mapped Area:</span>
                     <span class="metric-val" id="header-paddocks-area">0.00 ha</span>
                 </div>
-                <button id="btn-export-geojson" class="btn-primary" title="Exportar Parcelas em GeoJSON" disabled>
+                <button id="btn-export-geojson" class="btn-primary" title="Export Parcels as GeoJSON" disabled>
                     <i data-lucide="download"></i>
-                    <span>Exportar GeoJSON</span>
+                    <span>Export GeoJSON</span>
                 </button>
             </div>
         </header>
@@ -57,11 +57,11 @@
                 <div class="tab-nav">
                     <button id="tab-roi-btn" class="tab-btn active">
                         <i data-lucide="map-pin"></i>
-                        <span>1. Selecionar Área</span>
+                        <span>1. Select Area (ROI)</span>
                     </button>
                     <button id="tab-paddocks-btn" class="tab-btn">
                         <i data-lucide="layers"></i>
-                        <span>2. Parcelas (<span id="tab-paddocks-count">0</span>)</span>
+                        <span>2. Parcels (<span id="tab-paddocks-count">0</span>)</span>
                     </button>
                 </div>
 
@@ -69,22 +69,22 @@
                 <div id="tab-roi-content" class="tab-pane active">
                     <div class="section-box">
                         <label class="section-title">
-                            <i data-lucide="sparkles"></i> Fazendas de Demonstração (Prontas)
+                            <i data-lucide="sparkles"></i> Demo Estates (Pre-cached)
                         </label>
-                        <p class="hint-text">Escolha um imóvel já processado com Sentinel-2 NDVI multi-temporal:</p>
+                        <p class="hint-text">Select a pre-processed property with multitemporal Sentinel-2 NDVI composite:</p>
                         <select id="preset-selector" class="custom-select">
-                            <option value="">Carregando fazendas...</option>
+                            <option value="">Loading demo estates...</option>
                         </select>
                         <button id="btn-load-preset" class="btn-action w-100 mt-2">
-                            <i data-lucide="play"></i> Carregar Sentinel-2 no HQ-SAM
+                            <i data-lucide="play"></i> Load Sentinel-2 into HQ-SAM
                         </button>
                     </div>
 
                     <div class="section-box mt-3">
                         <label class="section-title">
-                            <i data-lucide="navigation"></i> Coordenadas Geográficas (Lat / Lon)
+                            <i data-lucide="navigation"></i> Geographic Coordinates (Lat / Lon)
                         </label>
-                        <p class="hint-text">Insira as coordenadas da propriedade:</p>
+                        <p class="hint-text">Enter property center coordinates:</p>
                         <div class="grid-2col">
                             <div class="input-group">
                                 <span class="input-label">Latitude</span>
@@ -97,40 +97,40 @@
                         </div>
                         <div class="grid-2col mt-2">
                             <div class="input-group">
-                                <span class="input-label">Raio (metros)</span>
+                                <span class="input-label">Buffer Radius (m)</span>
                                 <input type="number" id="input-buffer" class="custom-input" step="500" value="2000" />
                             </div>
                             <div class="input-group">
-                                <span class="input-label">Imagem do Modelo</span>
+                                <span class="input-label">Model Input Raster</span>
                                 <div class="model-badge-input">
                                     <i data-lucide="satellite"></i>
-                                    <span>Sentinel-2 (Padrão)</span>
+                                    <span>Sentinel-2 (Default)</span>
                                 </div>
                             </div>
                         </div>
                         <button id="btn-load-coords" class="btn-action w-100 mt-2">
-                            <i data-lucide="satellite"></i> Obter Sentinel-2 & Carregar
+                            <i data-lucide="satellite"></i> Fetch Sentinel-2 & Load
                         </button>
                     </div>
 
                     <div class="section-box mt-3">
                         <label class="section-title">
-                            <i data-lucide="file-text"></i> Código do Imóvel no CAR
+                            <i data-lucide="file-text"></i> Property Cadastral Code (CAR)
                         </label>
-                        <input type="text" id="input-car-id" class="custom-input" placeholder="Ex: GO-5203500-366A293867A24EF5A446DA91E23F8548" />
+                        <input type="text" id="input-car-id" class="custom-input" placeholder="e.g. GO-5203500-366A293867A24EF5A446DA91E23F8548" />
                         <button id="btn-load-car" class="btn-action w-100 mt-2">
-                            <i data-lucide="search"></i> Localizar CAR & Iniciar
+                            <i data-lucide="search"></i> Locate CAR & Load
                         </button>
                     </div>
 
                     <div class="section-box mt-3">
                         <label class="section-title">
-                            <i data-lucide="upload-cloud"></i> Upload de Vetor (.kmz / .kml / .gpkg / .geojson / .zip)
+                            <i data-lucide="upload-cloud"></i> Vector Boundary Upload (.kmz / .kml / .gpkg / .geojson / .zip)
                         </label>
-                        <p class="hint-text">Envie KML, KMZ, Shapefile (.zip), GeoPackage (.gpkg) ou GeoJSON:</p>
+                        <p class="hint-text">Upload KML, KMZ, Shapefile (.zip), GeoPackage (.gpkg), or GeoJSON:</p>
                         <div class="file-dropzone" id="file-dropzone">
                             <i data-lucide="file-up" class="dropzone-icon"></i>
-                            <span id="dropzone-text">Arraste ou clique para enviar (KML, KMZ, GeoJSON, GPKG, ZIP)</span>
+                            <span id="dropzone-text">Drag & drop or click to upload (KML, KMZ, GeoJSON, GPKG, ZIP)</span>
                             <input type="file" id="file-input" accept=".kml,.kmz,.gpkg,.zip,.geojson,.json,.shp" style="display:none;" />
                         </div>
                     </div>
@@ -141,32 +141,32 @@
                     <div class="paddocks-summary-card">
                         <div class="stat-item">
                             <span class="stat-num" id="paddocks-stat-count">0</span>
-                            <span class="stat-desc">Parcelas</span>
+                            <span class="stat-desc">Parcels</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-num" id="paddocks-stat-area">0.0</span>
-                            <span class="stat-desc">Hectares Totais</span>
+                            <span class="stat-desc">Total Hectares</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-num" id="paddocks-stat-avg">0.0</span>
-                            <span class="stat-desc">Média / Parcela</span>
+                            <span class="stat-desc">Mean / Parcel</span>
                         </div>
                     </div>
 
                     <div class="paddocks-actions mt-3">
-                        <button id="btn-regularize-paddocks" class="btn-action w-100" title="Garantir topologia estanque (0% sobreposição e cercas retificadas via Grafo Planar)">
-                            <i data-lucide="shield-check"></i> <span>Regularizar Topologia (Grafo Planar)</span>
+                        <button id="btn-regularize-paddocks" class="btn-action w-100" title="Enforce watertight topology (0% overlaps and straight fence lines via Planar Graph)">
+                            <i data-lucide="shield-check"></i> <span>Regularize Topology (Planar Graph)</span>
                         </button>
-                        <button id="btn-clear-all-paddocks" class="btn-secondary text-rose mt-2 w-100" title="Excluir todas as parcelas">
-                            <i data-lucide="trash-2"></i> <span>Limpar Todos</span>
+                        <button id="btn-clear-all-paddocks" class="btn-secondary text-rose mt-2 w-100" title="Delete all session parcels">
+                            <i data-lucide="trash-2"></i> <span>Clear All</span>
                         </button>
                     </div>
 
                     <div id="paddocks-list" class="paddocks-list mt-3">
                         <div class="empty-state">
                             <i data-lucide="mouse-pointer-click" class="empty-icon"></i>
-                            <p>Nenhuma parcela criada ainda.</p>
-                            <span>Clique sobre o mapa. Cada clique gerará imediatamente uma feição individual de parcela!</span>
+                            <p>No parcels created yet.</p>
+                            <span>Click on the map. Prompt points will immediately extract individual parcel polygons!</span>
                         </div>
                     </div>
                 </div>
@@ -180,20 +180,20 @@
                 <!-- Floating Current ROI Badge -->
                 <div id="active-roi-banner" class="glass-pill floating-top">
                     <i data-lucide="map"></i>
-                    <span id="active-roi-label">Nenhuma área carregada. Selecione ao lado.</span>
+                    <span id="active-roi-label">No area loaded. Select an ROI from the sidebar.</span>
                 </div>
 
                 <!-- Floating Visual Basemap Switcher (Sentinel default, Google and Esri auxiliary) -->
                 <div id="basemap-hud" class="glass-card floating-top-right">
-                    <span class="hud-mini-title"><i data-lucide="eye"></i> Visualização:</span>
+                    <span class="hud-mini-title"><i data-lucide="eye"></i> Basemap:</span>
                     <div class="basemap-btn-group">
-                        <button id="btn-bm-s2" class="bm-btn active" title="Imagem Sentinel-2 Oficial de Segmentação">
-                            <span class="bm-icon">🛰️</span> Sentinel-2 <span class="tag-default">Padrão</span>
+                        <button id="btn-bm-s2" class="bm-btn active" title="Official Sentinel-2 Segmentation Composite">
+                            <span class="bm-icon">🛰️</span> Sentinel-2 <span class="tag-default">Default</span>
                         </button>
-                        <button id="btn-bm-google" class="bm-btn" title="Google Satellite de Alta Resolução (Visualização Auxiliar)">
+                        <button id="btn-bm-google" class="bm-btn" title="High-Resolution Google Satellite (Visual Auxiliary)">
                             <span class="bm-icon">🌐</span> Google Sat <span class="tag-aux">Aux</span>
                         </button>
-                        <button id="btn-bm-esri" class="bm-btn" title="ESRI World Imagery (Visualização Auxiliar)">
+                        <button id="btn-bm-esri" class="bm-btn" title="ESRI World Imagery (Visual Auxiliary)">
                             <span class="bm-icon">🗺️</span> ESRI Imagery <span class="tag-aux">Aux</span>
                         </button>
                     </div>
@@ -209,42 +209,42 @@
                     <div class="dock-header">
                         <div class="dock-title-box">
                             <span class="dock-title" id="dock-title-text">
-                                <i data-lucide="crosshair"></i> Amostragem & Refinamento de Parcela
+                                <i data-lucide="crosshair"></i> Parcel Sampling & Refinement
                             </span>
                             <span class="dock-subtitle" id="dock-status-hint">
-                                Clique no mapa para adicionar pontos de amostragem na parcela
+                                Click on the map to add prompt sampling points to the parcel
                             </span>
                         </div>
                         <div class="dock-badges">
-                            <span id="candidate-points-badge" class="badge-points" style="display:none;">0 pontos</span>
-                            <span id="candidate-score-badge" class="badge-confidence" style="display:none;">Confiança: --%</span>
+                            <span id="candidate-points-badge" class="badge-points" style="display:none;">0 points</span>
+                            <span id="candidate-score-badge" class="badge-confidence" style="display:none;">Confidence: --%</span>
                             <span id="candidate-area-badge" class="badge-area" style="display:none;">0.00 ha</span>
                         </div>
                     </div>
 
                     <div class="dock-controls">
-                        <!-- Mode Selector (Positive: Incluir Pasto vs Negative: Excluir Área) -->
+                        <!-- Mode Selector (Positive: Include Pasture vs Negative: Exclude Area) -->
                         <div class="btn-toggle-group">
-                            <button id="btn-mode-positive" class="toggle-btn active" title="Clique no mapa para adicionar à área da parcela">
-                                <span class="dot-green"></span> Ponto Positivo (+)
+                            <button id="btn-mode-positive" class="toggle-btn active" title="Click inside the parcel to include area">
+                                <span class="dot-green"></span> Positive Point (+)
                             </button>
-                            <button id="btn-mode-negative" class="toggle-btn" title="Clique em estradas, matas ou vizinhos para recortar/excluir">
-                                <span class="dot-red"></span> Ponto Negativo (−)
+                            <button id="btn-mode-negative" class="toggle-btn" title="Click outside or on dividers to exclude area / slice parcel">
+                                <span class="dot-red"></span> Negative Point (−)
                             </button>
                         </div>
 
                         <!-- Refinement & Confirmation Buttons -->
                         <div class="dock-actions">
-                            <button id="btn-confirm-paddock" class="btn-confirm-paddock" disabled title="Confirmar e salvar o polígono segmentado na coleção">
-                                <i data-lucide="check-circle-2"></i> <span id="confirm-btn-label">Confirmar Parcela</span>
+                            <button id="btn-confirm-paddock" class="btn-confirm-paddock" disabled title="Confirm and commit proposed polygon to parcel collection">
+                                <i data-lucide="check-circle-2"></i> <span id="confirm-btn-label">Confirm Parcel</span>
                             </button>
-                            <button id="btn-undo-point" class="btn-secondary" disabled title="Remover o último ponto de amostragem adicionado">
-                                <i data-lucide="corner-up-left"></i> <span>Desfazer Ponto</span>
+                            <button id="btn-undo-point" class="btn-secondary" disabled title="Remove last prompt point">
+                                <i data-lucide="corner-up-left"></i> <span>Undo Point</span>
                             </button>
-                            <button id="btn-clear-points" class="btn-secondary text-rose" disabled title="Cancelar rascunho atual e remover todos os pontos">
-                                <i data-lucide="x-circle"></i> <span>Cancelar</span>
+                            <button id="btn-clear-points" class="btn-secondary text-rose" disabled title="Cancel active draft and clear prompt points">
+                                <i data-lucide="x-circle"></i> <span>Cancel</span>
                             </button>
-                            <button id="btn-toggle-overlay" class="btn-secondary" title="Alternar camada Sentinel-2">
+                            <button id="btn-toggle-overlay" class="btn-secondary" title="Toggle Sentinel-2 overlay">
                                 <i data-lucide="layers"></i> <span>Sentinel</span>
                             </button>
                         </div>
@@ -252,7 +252,7 @@
 
                     <!-- Overlay Opacity Slider -->
                     <div class="dock-slider-row" id="opacity-slider-row">
-                        <span class="slider-label">Transparência Sentinel-2 sobre Basemap:</span>
+                        <span class="slider-label">Sentinel-2 Overlay Opacity:</span>
                         <input type="range" id="overlay-opacity-slider" min="0" max="100" value="85" />
                         <span id="opacity-val" class="font-mono text-xs">85%</span>
                     </div>
@@ -264,8 +264,8 @@
                         <div class="spinner-header">
                             <div class="orbit-spinner"></div>
                         </div>
-                        <h3 id="loading-title">Obtendo Imagens Sentinel-2...</h3>
-                        <p id="loading-desc">Iniciando comunicação com serviço orbital...</p>
+                        <h3 id="loading-title">Acquiring Sentinel-2 Imagery...</h3>
+                        <p id="loading-desc">Querying Earth Engine satellite service...</p>
 
                         <!-- Progress Bar Component -->
                         <div class="progress-container">
@@ -273,7 +273,7 @@
                                 <div id="loading-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
                             </div>
                             <div class="progress-meta">
-                                <span id="loading-subdetail" class="progress-subdetail font-mono">Calculando grade...</span>
+                                <span id="loading-subdetail" class="progress-subdetail font-mono">Computing grid...</span>
                                 <span id="loading-percent-text" class="progress-percent font-mono">0%</span>
                             </div>
                         </div>

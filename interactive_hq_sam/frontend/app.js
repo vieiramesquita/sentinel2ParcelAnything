@@ -179,11 +179,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.isOverlayVisible) {
             state.overlayLayer.addTo(map);
             state.overlayLayer.setOpacity(parseFloat(dom.opacitySlider.value) / 100.0);
-            dom.btnToggleOverlay.innerHTML = '<i data-lucide="layers"></i> <span>Sentinel: Ligado</span>';
+            dom.btnToggleOverlay.innerHTML = '<i data-lucide="layers"></i> <span>Sentinel: On</span>';
             dom.btnToggleOverlay.classList.remove('text-rose');
         } else {
             map.removeLayer(state.overlayLayer);
-            dom.btnToggleOverlay.innerHTML = '<i data-lucide="layers"></i> <span>Sentinel: Oculto</span>';
+            dom.btnToggleOverlay.innerHTML = '<i data-lucide="layers"></i> <span>Sentinel: Hidden</span>';
             dom.btnToggleOverlay.classList.add('text-rose');
         }
         if (window.lucide) lucide.createIcons();
@@ -288,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.presetSelector.innerHTML = '';
 
             if (presets.length === 0) {
-                dom.presetSelector.innerHTML = '<option value="">Nenhuma fazenda encontrada em results/</option>';
+                dom.presetSelector.innerHTML = '<option value="">No properties found in results/</option>';
                 return;
             }
 
@@ -299,8 +299,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 dom.presetSelector.appendChild(opt);
             });
         } catch (err) {
-            console.error("Erro ao buscar presets:", err);
-            dom.presetSelector.innerHTML = '<option value="">Erro ao carregar presets</option>';
+            console.error("Error fetching presets:", err);
+            dom.presetSelector.innerHTML = '<option value="">Error loading presets</option>';
         }
     }
     fetchPresets();
@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // =========================================================================
     function applyLoadedRoi(data) {
         state.activeRoi = data;
-        dom.activeRoiLabel.innerHTML = `<strong>Área Ativa:</strong> ${data.roi_name || data.roi_id} <span class="tag-default">Sentinel-2</span>`;
+        dom.activeRoiLabel.innerHTML = `<strong>Active ROI:</strong> ${data.roi_name || data.roi_id} <span class="tag-default">Sentinel-2</span>`;
         dom.mapElement.classList.add('sampling-mode');
 
         // Limpa estado anterior
@@ -333,7 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     interactive: false
                 }).addTo(map);
                 state.isOverlayVisible = true;
-                dom.btnToggleOverlay.innerHTML = '<i data-lucide="layers"></i> <span>Sentinel: Ligado</span>';
+                dom.btnToggleOverlay.innerHTML = '<i data-lucide="layers"></i> <span>Sentinel: On</span>';
                 dom.btnToggleOverlay.classList.remove('text-rose');
             }
         }
@@ -373,12 +373,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!res.ok) {
                 const err = await res.json();
-                throw new Error(err.detail || "Falha ao carregar preset");
+                throw new Error(err.detail || "Failed to load preset");
             }
             const data = await res.json();
             applyLoadedRoi(data);
         } catch (err) {
-            alert(`Erro: ${err.message}`);
+            alert(`Error: ${err.message}`);
         } finally {
             hideLoading();
         }
@@ -391,11 +391,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const buffer = parseFloat(dom.inputBuffer.value) || 2000;
 
         if (isNaN(lat) || isNaN(lon)) {
-            alert("Por favor, informe latitude e longitude válidas.");
+            alert("Please provide valid latitude and longitude coordinates.");
             return;
         }
 
-        showLoading("Obtendo Sentinel-2 Oficial...", `Carregando mosaico Sentinel-2 para (${lat.toFixed(4)}, ${lon.toFixed(4)})...`);
+        showLoading("Acquiring Official Sentinel-2...", `Loading Sentinel-2 composite for (${lat.toFixed(4)}, ${lon.toFixed(4)})...`);
         try {
             const res = await fetch('/api/roi/coords', {
                 method: 'POST',
@@ -404,12 +404,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!res.ok) {
                 const err = await res.json();
-                throw new Error(err.detail || "Falha ao carregar coordenadas");
+                throw new Error(err.detail || "Failed to load coordinates");
             }
             const data = await res.json();
             applyLoadedRoi(data);
         } catch (err) {
-            alert(`Erro: ${err.message}`);
+            alert(`Error: ${err.message}`);
         } finally {
             hideLoading();
         }
@@ -419,11 +419,11 @@ document.addEventListener('DOMContentLoaded', () => {
     dom.btnLoadCar.addEventListener('click', async () => {
         const carId = dom.inputCarId.value.trim();
         if (!carId) {
-            alert("Informe o código CAR do imóvel.");
+            alert("Please enter the CAR property code.");
             return;
         }
 
-        showLoading("Localizando CAR e Sentinel-2...", `Buscando imóvel ${carId}...`);
+        showLoading("Locating CAR & Sentinel-2...", `Searching property ${carId}...`);
         try {
             const res = await fetch('/api/roi/car_id', {
                 method: 'POST',
@@ -432,12 +432,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!res.ok) {
                 const err = await res.json();
-                throw new Error(err.detail || "Código CAR não encontrado");
+                throw new Error(err.detail || "CAR property code not found");
             }
             const data = await res.json();
             applyLoadedRoi(data);
         } catch (err) {
-            alert(`Erro: ${err.message}`);
+            alert(`Error: ${err.message}`);
         } finally {
             hideLoading();
         }
@@ -467,7 +467,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const formData = new FormData();
         formData.append('file', file);
 
-        showLoading("Enviando e Processando Vetor...", `Lendo limites de ${file.name} e preparando Sentinel-2 correspondente...`);
+        showLoading("Uploading & Processing Vector...", `Reading boundaries from ${file.name} and fetching Sentinel-2 composite...`);
         try {
             const res = await fetch('/api/roi/upload', {
                 method: 'POST',
@@ -475,12 +475,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!res.ok) {
                 const err = await res.json();
-                throw new Error(err.detail || "Falha no upload");
+                throw new Error(err.detail || "Upload failed");
             }
             const data = await res.json();
             applyLoadedRoi(data);
         } catch (err) {
-            alert(`Erro no upload: ${err.message}`);
+            alert(`Upload error: ${err.message}`);
         } finally {
             hideLoading();
         }
@@ -506,7 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // =========================================================================
     map.on('click', async (e) => {
         if (!state.activeRoi) {
-            alert("Selecione primeiro uma fazenda ou coordenada na barra lateral.");
+            alert("Please select a property or enter coordinates from the sidebar first.");
             return;
         }
 
@@ -587,8 +587,8 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.candidateScoreBadge.style.display = 'none';
             dom.candidateAreaBadge.style.display = 'none';
 
-            dom.dockTitleText.innerHTML = '<i data-lucide="crosshair"></i> Amostragem & Refinamento de Parcela';
-            dom.dockStatusHint.innerText = 'Clique no mapa para adicionar pontos de amostragem na parcela';
+            dom.dockTitleText.innerHTML = '<i data-lucide="crosshair"></i> Parcel Sampling & Refinement';
+            dom.dockStatusHint.innerText = 'Click on the map to add prompt sampling points to the parcel';
             if (window.lucide) lucide.createIcons();
             return;
         }
@@ -612,12 +612,12 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.btnConfirmPaddock.classList.remove('ready');
             dom.candidateScoreBadge.style.display = 'none';
             dom.candidateAreaBadge.style.display = 'none';
-            dom.dockStatusHint.innerText = 'Adicione ao menos um ponto positivo (+) no interior da área para segmentar.';
+            dom.dockStatusHint.innerText = 'Add at least one positive point (+) inside the parcel to segment.';
             return;
         }
 
         // Dispara predição no backend HQ-SAM
-        dom.dockStatusHint.innerText = 'Calculando segmentação no Sentinel-2 com HQ-SAM (GPU)...';
+        dom.dockStatusHint.innerText = 'Predicting segmentation on Sentinel-2 with HQ-SAM (GPU)...';
         try {
             const payload = state.candidatePoints.map(p => ({ lon: p.lon, lat: p.lat, label: p.label }));
             const res = await fetch('/api/predict', {
@@ -628,7 +628,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!res.ok) {
                 const err = await res.json();
-                console.error("Erro na predição:", err);
+                console.error("Prediction error:", err);
                 return;
             }
 
@@ -654,7 +654,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }).addTo(map);
 
                 // Atualiza badges
-                dom.candidateScoreBadge.innerText = `Confiança: ${bestMask.confidence_score}%`;
+                dom.candidateScoreBadge.innerText = `Confidence: ${bestMask.confidence_score}%`;
                 dom.candidateScoreBadge.style.display = 'inline-block';
                 dom.candidateAreaBadge.innerText = `${bestMask.area_ha} ha`;
                 dom.candidateAreaBadge.style.display = 'inline-block';
@@ -664,20 +664,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 dom.btnConfirmPaddock.classList.add('ready');
 
                 if (state.editingPaddockId) {
-                    dom.dockTitleText.innerHTML = '<i data-lucide="edit-3"></i> Refinando Parcela Existente';
-                    dom.dockStatusHint.innerText = `Área calculada: ${bestMask.area_ha} ha. Adicione/remova pontos ou confirme as alterações.`;
+                    dom.dockTitleText.innerHTML = '<i data-lucide="edit-3"></i> Refining Existing Parcel';
+                    dom.dockStatusHint.innerText = `Calculated area: ${bestMask.area_ha} ha. Add/remove points or confirm changes.`;
                 } else {
-                    dom.dockTitleText.innerHTML = '<i data-lucide="crosshair"></i> Rascunho de Parcela Proposta';
-                    dom.dockStatusHint.innerText = `Polígono gerado: ${bestMask.area_ha} ha (${bestMask.confidence_score}%). Confirme para salvar.`;
+                    dom.dockTitleText.innerHTML = '<i data-lucide="crosshair"></i> Proposed Parcel Draft';
+                    dom.dockStatusHint.innerText = `Predicted parcel: ${bestMask.area_ha} ha (${bestMask.confidence_score}%). Confirm to commit.`;
                 }
             } else {
-                dom.dockStatusHint.innerText = 'Nenhuma parcela identificada nesta combinação de pontos. Ajuste os cliques.';
+                dom.dockStatusHint.innerText = 'No parcel detected for this prompt point combination. Adjust your clicks.';
                 dom.btnConfirmPaddock.disabled = true;
                 dom.btnConfirmPaddock.classList.remove('ready');
             }
         } catch (err) {
-            console.error("Falha ao atualizar predição:", err);
-            dom.dockStatusHint.innerText = `Erro ao processar: ${err.message}`;
+            console.error("Failed to update prediction:", err);
+            dom.dockStatusHint.innerText = `Error processing: ${err.message}`;
         }
 
         if (window.lucide) lucide.createIcons();
@@ -721,7 +721,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.editingPaddockId = null;
         }
 
-        dom.confirmBtnLabel.innerText = "Confirmar Parcela";
+        dom.confirmBtnLabel.innerText = "Confirm Parcel";
         dom.btnConfirmPaddock.disabled = true;
         dom.btnConfirmPaddock.classList.remove('ready');
         dom.btnUndoPoint.disabled = true;
@@ -731,8 +731,8 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.candidateScoreBadge.style.display = 'none';
         dom.candidateAreaBadge.style.display = 'none';
 
-        dom.dockTitleText.innerHTML = '<i data-lucide="crosshair"></i> Amostragem & Refinamento de Parcela';
-        dom.dockStatusHint.innerText = 'Clique no mapa para adicionar pontos de amostragem na parcela';
+        dom.dockTitleText.innerHTML = '<i data-lucide="crosshair"></i> Parcel Sampling & Refinement';
+        dom.dockStatusHint.innerText = 'Click on the map to add prompt sampling points to the parcel';
 
         // Volta para o modo positivo
         state.currentMode = 'positive';
@@ -772,7 +772,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (!res.ok) {
                         const err = await res.json();
-                        alert(`Erro ao atualizar: ${err.detail || 'Falha no backend'}`);
+                        alert(`Update error: ${err.detail || 'Backend failure'}`);
                         return;
                     }
 
@@ -792,7 +792,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     updatePaddocksStats();
                     renderPaddocksList();
                 } catch (err) {
-                    alert(`Falha ao salvar alterações: ${err.message}`);
+                    alert(`Failed to save changes: ${err.message}`);
                 }
             }
         } else {
@@ -800,7 +800,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // CRIAÇÃO E CONFIRMAÇÃO DE NOVA PARCELA
             // =================================================================
             const paddockNumber = state.savedPaddocks.length + 1;
-            const paddockName = `Parcela ${paddockNumber}`;
+            const paddockName = `Parcel ${paddockNumber}`;
 
             try {
                 const res = await fetch('/api/paddock/save', {
@@ -817,7 +817,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (!res.ok) {
                     const err = await res.json();
-                    alert(`Erro ao salvar: ${err.detail || 'Falha no backend'}`);
+                    alert(`Error saving: ${err.detail || 'Backend failure'}`);
                     return;
                 }
 
@@ -842,7 +842,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updatePaddocksStats();
                 renderPaddocksList();
             } catch (err) {
-                alert(`Falha ao salvar parcela: ${err.message}`);
+                alert(`Failed to save parcel: ${err.message}`);
             }
         }
     });
@@ -962,8 +962,8 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.paddocksList.innerHTML = `
                 <div class="empty-state">
                     <i data-lucide="mouse-pointer-click" class="empty-icon"></i>
-                    <p>Nenhuma parcela criada ainda.</p>
-                    <span>Clique sobre o mapa. Adicione/remova pontos de refinamento e clique em 'Confirmar Parcela' para salvar!</span>
+                    <p>No parcels created yet.</p>
+                    <span>Click on the map. Add/remove prompt points and click 'Confirm Parcel' to save!</span>
                 </div>
             `;
             if (window.lucide) lucide.createIcons();
@@ -979,14 +979,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="paddock-meta">
                         <span class="paddock-meta-badge">${p.area_ha} ha</span>
                         <span>•</span>
-                        <span>Confiança: ${p.confidence_score}%</span>
+                        <span>Confidence: ${p.confidence_score}%</span>
                     </div>
                 </div>
                 <div class="paddock-actions">
-                    <button class="btn-edit-paddock" data-id="${p.id}" title="Refinar e ajustar polígono desta parcela">
+                    <button class="btn-edit-paddock" data-id="${p.id}" title="Refine and adjust parcel boundary">
                         <i data-lucide="edit-3"></i>
                     </button>
-                    <button class="btn-del-paddock" data-id="${p.id}" title="Excluir parcela">
+                    <button class="btn-del-paddock" data-id="${p.id}" title="Delete parcel">
                         <i data-lucide="trash"></i>
                     </button>
                 </div>
@@ -1055,25 +1055,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     dom.btnClearAllPaddocks.addEventListener('click', async () => {
         if (state.savedPaddocks.length === 0) return;
-        if (!confirm("Deseja realmente excluir todas as parcelas da sessão?")) return;
+        if (!confirm("Are you sure you want to delete all session parcels?")) return;
 
         try {
             await fetch('/api/paddocks/clear', { method: 'POST' });
             clearAllPaddocks();
         } catch (err) {
-            console.error("Erro ao limpar parcelas:", err);
+            console.error("Error clearing parcels:", err);
         }
     });
 
     if (dom.btnRegularizePaddocks) {
         dom.btnRegularizePaddocks.addEventListener('click', async () => {
             if (state.savedPaddocks.length === 0) {
-                alert("Nenhuma parcela para regularizar.");
+                alert("No parcels to regularize.");
                 return;
             }
             try {
                 dom.btnRegularizePaddocks.disabled = true;
-                dom.btnRegularizePaddocks.innerHTML = '<i data-lucide="loader"></i> <span>Regularizando...</span>';
+                dom.btnRegularizePaddocks.innerHTML = '<i data-lucide="loader"></i> <span>Regularizing...</span>';
                 if (window.lucide) lucide.createIcons();
 
                 const res = await fetch('/api/paddocks/regularize', { method: 'POST' });
@@ -1091,16 +1091,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     updatePaddocksStats();
                     renderPaddocksList();
-                    alert(`Topologia estanque regularizada com sucesso via Grafo Planar!\n0% de sobreposições em ${data.count} parcelas.`);
+                    alert(`Watertight topology successfully regularized via Planar Graph!\n0% overlaps across ${data.count} parcels.`);
                 } else {
-                    alert("Aviso na regularização de topologia.");
+                    alert("Topology regularization notice.");
                 }
             } catch (err) {
-                console.error("Erro na regularização:", err);
-                alert("Erro ao regularizar topologia: " + err.message);
+                console.error("Error in regularization:", err);
+                alert("Error regularizing topology: " + err.message);
             } finally {
                 dom.btnRegularizePaddocks.disabled = false;
-                dom.btnRegularizePaddocks.innerHTML = '<i data-lucide="shield-check"></i> <span>Regularizar Topologia (Grafo Planar)</span>';
+                dom.btnRegularizePaddocks.innerHTML = '<i data-lucide="shield-check"></i> <span>Regularize Topology (Planar Graph)</span>';
                 if (window.lucide) lucide.createIcons();
             }
         });
