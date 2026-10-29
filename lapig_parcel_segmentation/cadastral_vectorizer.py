@@ -1,12 +1,12 @@
 """
-Módulo 4: Vetorização Cadastral e Retificação de Cercas Retas
-LAPIG - Laboratório de Processamento de Imagens e Geoprocessamento
+Module 4: Cadastral Vectorization and Straight Fence Regularization
+LAPIG - Image Processing and Geoprocessing Laboratory
 
-Garantias:
-1. Eliminação total de ilhas internas / enclaves / buracos.
-2. Lances de cerca retos de mourão a mourão (2 vértices por segmento reto).
-3. Regularização retangular de parcelas regulares.
-4. Zero Sobreposições (0.000 m²) e Zero Frestas (Grafo Planar Watertight).
+Core Guarantees:
+1. Complete elimination of internal enclaves/islands/holes.
+2. Post-to-post straight fence line segments (2 vertices per straight stretch).
+3. Rectangular regularization for regular geometric parcels.
+4. Zero Overlaps (0.000 m²) and Zero Gaps (Watertight Planar Graph).
 """
 
 import os
@@ -21,8 +21,8 @@ import scipy.ndimage as ndi
 
 def eliminate_small_polygons_and_enclaves(gdf, min_area_ha=2.0):
     """
-    Remove anéis internos (ilhas/buracos) e dissolve polígonos menores que min_area_ha
-    no vizinho adjacente com maior extensão de divisa compartilhada.
+    Removes internal rings (islands/holes) and dissolves polygons smaller than min_area_ha
+    into the adjacent neighbor sharing the longest common boundary.
     """
     cleaned_geoms = []
     for geom in gdf.geometry:
@@ -84,9 +84,9 @@ def eliminate_small_polygons_and_enclaves(gdf, min_area_ha=2.0):
 
 def vectorize_and_straighten_parcels(sam_mask_tif, min_area_ha=2.0, straight_tol=22.0):
     """
-    Executa a vetorização e retificação de cercas retas sobre o raster de máscaras do SAMGeo.
+    Executes vectorization and straight fence regularization over the SAMGeo raster mask.
     """
-    print(f"\n📐 Vetorizando e Retificando Cercas: {os.path.basename(sam_mask_tif)}...")
+    print(f"\nVectorizing and Straightening Fence Lines: {os.path.basename(sam_mask_tif)}...")
 
     with rasterio.open(sam_mask_tif) as src_m:
         mask = src_m.read(1)
@@ -102,16 +102,16 @@ def vectorize_and_straighten_parcels(sam_mask_tif, min_area_ha=2.0, straight_tol
     gdf_initial = gpd.GeoDataFrame({'geometry': raw_polys}, crs=crs)
     gdf_initial['area_ha'] = (gdf_initial.geometry.area / 10000.0).round(2)
 
-    # 1. Homogeneização inicial (eliminar ilhas e micro-polígonos)
+    # 1. Initial homogenization (eliminate enclaves and micro-polygons)
     gdf_homog = eliminate_small_polygons_and_enclaves(gdf_initial, min_area_ha=min_area_ha)
 
-    # 2. Grafo Planar
+    # 2. Planar Graph topology construction
     boundaries = [p.boundary for p in gdf_homog.geometry]
     noded = shapely.node(unary_union(boundaries))
     merged = linemerge(noded)
     lines = merged.geoms if isinstance(merged, MultiLineString) else [merged]
 
-    # 3. Retificação dos lances de cerca
+    # 3. Fence line chord rectification
     straight_lines = []
     for line in lines:
         if line.length < 5.0:
@@ -125,7 +125,7 @@ def vectorize_and_straighten_parcels(sam_mask_tif, min_area_ha=2.0, straight_tol
         else:
             straight_lines.append(line.simplify(straight_tol * 0.75, preserve_topology=True))
 
-    # 4. Reconstrução Planar
+    # 4. Planar Reconstruction
     noded_straight = shapely.node(unary_union(straight_lines))
     reconstructed = list(polygonize(noded_straight))
 
@@ -147,19 +147,19 @@ def vectorize_and_straighten_parcels(sam_mask_tif, min_area_ha=2.0, straight_tol
     gdf_final['mrr_ratio'] = [round(p.area / p.minimum_rotated_rectangle.area, 2) for p in gdf_final.geometry]
     gdf_final['id'] = range(1, len(gdf_final) + 1)
 
-    print(f"✅ Vetorização retificada concluída: {len(gdf_final)} parcelas ({gdf_final['area_ha'].sum():.2f} ha)")
+    print(f"Straight fence vectorization completed: {len(gdf_final)} parcels ({gdf_final['area_ha'].sum():.2f} ha)")
     return gdf_final
 
 def clip_parcels_by_car(gdf_parcels, car_geom_or_gdf, min_area_ha=1.0):
     """
-    Recorta as parcelas perfeitamente nos limites da propriedade (CAR).
-    Remove lascas de borda menores que min_area_ha e garante topologia válida.
+    Clips parcels precisely to the rural property boundary (CAR).
+    Removes boundary slivers smaller than min_area_ha and guarantees valid topology.
     """
-    print("\n✂️ Recortando parcelas pelo limite do CAR...")
+    print("\nClipping parcels to CAR property boundary...")
     if isinstance(car_geom_or_gdf, gpd.GeoDataFrame):
         gdf_car = car_geom_or_gdf.to_crs(gdf_parcels.crs)
     else:
-        # Geometria pura shapely
+        # Raw Shapely geometry
         gdf_car = gpd.GeoDataFrame({'geometry': [car_geom_or_gdf]}, crs="EPSG:4674").to_crs(gdf_parcels.crs)
 
     gdf_clipped = gpd.clip(gdf_parcels, gdf_car)
@@ -168,19 +168,19 @@ def clip_parcels_by_car(gdf_parcels, car_geom_or_gdf, min_area_ha=1.0):
     gdf_clipped = gdf_clipped[gdf_clipped.geometry.type == 'Polygon'].copy()
     gdf_clipped['geometry'] = [Polygon(p.exterior) for p in gdf_clipped.geometry]
 
-    # Recalcular área métrica
+    # Recompute metric area
     gdf_utm = gdf_clipped.to_crs(gdf_clipped.estimate_utm_crs())
     gdf_clipped['area_ha'] = (gdf_utm.geometry.area / 10000.0).round(2)
 
-    # Remover micro-lascas de corte da cerca externa
+    # Filter out boundary cutting slivers
     gdf_clipped = gdf_clipped[gdf_clipped['area_ha'] >= min_area_ha].reset_index(drop=True)
     gdf_clipped['id'] = range(1, len(gdf_clipped) + 1)
 
-    print(f"✅ Recorte CAR finalizado: {len(gdf_clipped)} parcelas dentro do imóvel.")
+    print(f"CAR boundary clip complete: {len(gdf_clipped)} parcels within property.")
     return gdf_clipped
 
-def generate_cadastral_stats(gdf_final, title="RELATÓRIO DE PARCELAS (LAPIG)"):
-    """Exibe relatório estatístico da segmentação."""
+def generate_cadastral_stats(gdf_final, title="PARCEL CADASTRAL REPORT (LAPIG)"):
+    """Displays statistical summary of segmented parcels."""
     total_area = gdf_final['area_ha'].sum()
     num_parcelas = len(gdf_final)
     avg_area = gdf_final['area_ha'].mean() if num_parcelas > 0 else 0
@@ -189,13 +189,13 @@ def generate_cadastral_stats(gdf_final, title="RELATÓRIO DE PARCELAS (LAPIG)"):
     avg_v = gdf_final['vertices'].mean() if 'vertices' in gdf_final.columns else 0
 
     print("\n" + "=" * 50)
-    print(f"📊 {title}")
+    print(f"{title}")
     print("=" * 50)
-    print(f"🔹 Número total de parcelas:     {num_parcelas}")
-    print(f"🔹 Área total mapeada:           {total_area:.2f} ha")
-    print(f"🔹 Tamanho médio das parcelas:   {avg_area:.2f} ha")
-    print(f"🔹 Menor parcela:                {min_area:.2f} ha")
-    print(f"🔹 Maior parcela:                {max_area:.2f} ha")
+    print(f"  Total number of parcels:      {num_parcelas}")
+    print(f"  Total mapped area:            {total_area:.2f} ha")
+    print(f"  Mean parcel size:             {avg_area:.2f} ha")
+    print(f"  Minimum parcel size:          {min_area:.2f} ha")
+    print(f"  Maximum parcel size:          {max_area:.2f} ha")
     if avg_v > 0:
-        print(f"🔹 Média de vértices por cerca:  {avg_v:.1f} vértices")
+        print(f"  Mean vertices per fence:      {avg_v:.1f} vertices")
     print("=" * 50)

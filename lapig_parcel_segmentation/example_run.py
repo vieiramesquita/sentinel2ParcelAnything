@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-Script de Exemplo de Execução do Pipeline Cadastral de Parcelas (LAPIG)
-Suporta execução com arquivo local (shp, fgb, gpkg, parquet), asset EE ou coordenadas.
+Example Execution Script for the LAPIG Cadastral Parcel Segmentation Pipeline
+Supports execution with local vector files (.shp, .fgb, .gpkg, .parquet), Earth Engine assets, or coordinates.
 
-Exemplos de Uso com o arquivo GeoPackage do CAR de Goiás:
-  # 1. Listar todos os códigos de imóveis (cod_imovel) disponíveis no arquivo:
+Usage Examples with the Goiás CAR GeoPackage:
+  # 1. List all rural property codes (cod_imovel) available in the vector file:
   python example_run.py --input "car_goias_area_imovel_epsg4674_hottest.gpkg" --id-col "cod_imovel" --list-ids
 
-  # 2. Rodar o pipeline para um imóvel específico:
+  # 2. Run the pipeline for a specific property:
   python example_run.py --input "car_goias_area_imovel_epsg4674_hottest.gpkg" --id-col "cod_imovel" --id-val "GO-5203500-366A293867A24EF5A446DA91E23F8548" --year 2025
 
-  # 3. Rodar em lote para TODOS os imóveis do arquivo:
+  # 3. Run in batch mode for ALL properties in the file:
   python example_run.py --input "car_goias_area_imovel_epsg4674_hottest.gpkg" --id-col "cod_imovel" --all
 
-  # 4. Rodar um lote de teste com os primeiros 2 imóveis:
+  # 4. Run a batch test on the first 2 properties:
   python example_run.py --input "car_goias_area_imovel_epsg4674_hottest.gpkg" --id-col "cod_imovel" --limit 2
 """
 
@@ -36,27 +36,27 @@ except ImportError:
     from pipeline_parcel_segmentation import run_analysis_lapig, run_batch_analysis_lapig
 
 def main():
-    parser = argparse.ArgumentParser(description="Execução Cadastral de Parcelas - LAPIG")
-    parser.add_argument("--input", type=str, default=None, help="Arquivo local (.shp, .gpkg, .fgb, .parquet), asset EE ou coordenada 'lat, lon'")
-    parser.add_argument("--coord", type=str, default=None, help="Coordenada geográfica 'lat, lon' para busca automática no CAR")
-    parser.add_argument("--id-col", type=str, default=None, dest="id_col", help="Nome da coluna de ID no arquivo vetorial (ex: cod_imovel, id)")
-    parser.add_argument("--id-val", type=str, default=None, dest="id_val", help="Valor do ID caso queira rodar apenas para um imóvel específico")
-    parser.add_argument("--all", action="store_true", help="Executa o pipeline em lote para TODOS os imóveis do arquivo vetorial")
-    parser.add_argument("--limit", type=int, default=None, help="Limita o número de imóveis a processar no lote (ex: --limit 3)")
-    parser.add_argument("--list-ids", action="store_true", dest="list_ids", help="Lista todos os IDs disponíveis no arquivo vetorial e encerra")
-    parser.add_argument("--farm", type=str, default=None, choices=["GO", "MS"], help="Preset de teste rápido: GO ou MS")
-    parser.add_argument("--filter", nargs=2, metavar=('CAMPO', 'VALOR'), default=None, help="Filtro opcional para asset do EE (ex: --filter cod_imovel GO-...)")
-    parser.add_argument("--year", type=int, default=2025, help="Ano da análise (até 2025)")
-    parser.add_argument("--collection", type=str, default="10m", choices=["10m", "30m"], help="Coleção MapBiomas (10m Col 4 ou 30m Col 11)")
-    parser.add_argument("--output-dir", type=str, default="results", dest="output_dir", help="Diretório raiz para as pastas de resultados")
-    parser.add_argument("--min_area", type=float, default=2.0, help="Área mínima da parcela em hectares")
-    parser.add_argument("--straight-tol", type=float, default=22.0, dest="straight_tol", help="Tolerância de simplificação/retificação de cercas (metros)")
-    parser.add_argument("--no-pasture-filter", action="store_true", dest="no_pasture", help="Desabilita o filtro do MapBiomas e gera apenas a segmentação pura")
-    parser.add_argument("--project", type=str, default=None, help="Projeto Google Earth Engine (opcional, usa a sessão ativa por padrão)")
+    parser = argparse.ArgumentParser(description="Cadastral Parcel Segmentation - LAPIG Pipeline")
+    parser.add_argument("--input", type=str, default=None, help="Local vector file (.shp, .gpkg, .fgb, .parquet), EE asset, or 'lat, lon' coordinates")
+    parser.add_argument("--coord", type=str, default=None, help="Geographic coordinate 'lat, lon' for automatic CAR query")
+    parser.add_argument("--id-col", type=str, default=None, dest="id_col", help="Property ID column name in the vector file (e.g., cod_imovel, id)")
+    parser.add_argument("--id-val", type=str, default=None, dest="id_val", help="Specific property ID value to process individually")
+    parser.add_argument("--all", action="store_true", help="Execute the batch pipeline for ALL properties in the vector file")
+    parser.add_argument("--limit", type=int, default=None, help="Limit number of properties to process in batch mode (e.g., --limit 3)")
+    parser.add_argument("--list-ids", action="store_true", dest="list_ids", help="List all property IDs available in the vector file and exit")
+    parser.add_argument("--farm", type=str, default=None, choices=["GO", "MS"], help="Quick test preset: GO or MS")
+    parser.add_argument("--filter", nargs=2, metavar=('FIELD', 'VALUE'), default=None, help="Optional filter for EE asset (e.g., --filter cod_imovel GO-...)")
+    parser.add_argument("--year", type=int, default=2025, help="Analysis year (Sentinel-2 & MapBiomas, default: 2025)")
+    parser.add_argument("--collection", type=str, default="10m", choices=["10m", "30m"], help="MapBiomas collection (10m Col 4 or 30m Col 11)")
+    parser.add_argument("--output-dir", type=str, default="results", dest="output_dir", help="Base directory for output folders")
+    parser.add_argument("--min_area", type=float, default=2.0, help="Minimum parcel area threshold in hectares")
+    parser.add_argument("--straight-tol", type=float, default=22.0, dest="straight_tol", help="Straight fence line simplification/rectification tolerance (meters)")
+    parser.add_argument("--no-pasture-filter", action="store_true", dest="no_pasture", help="Disable MapBiomas pasture filter and produce raw segmentation only")
+    parser.add_argument("--project", type=str, default=None, help="Google Earth Engine project ID (optional, uses active session by default)")
 
     args = parser.parse_args()
 
-    # Recurso: Listar IDs do arquivo vetorial se solicitado
+    # Feature: List IDs in the vector file if requested
     if args.list_ids:
         target_file = args.input or "car_goias_area_imovel_epsg4674_hottest.gpkg"
         if not os.path.isabs(target_file) and not os.path.exists(target_file):
@@ -67,7 +67,7 @@ def main():
                     break
 
         if not os.path.exists(target_file):
-            print(f"❌ Arquivo não encontrado: {target_file}")
+            print(f"[-] File not found: {target_file}")
             sys.exit(1)
 
         id_col = args.id_col or "cod_imovel"
@@ -75,12 +75,12 @@ def main():
         gdf = gpd.read_parquet(target_file) if ext in ['.parquet', '.geoparquet'] else gpd.read_file(target_file)
 
         if id_col not in gdf.columns:
-            print(f"❌ Coluna '{id_col}' não encontrada no arquivo.")
-            print(f"   Colunas disponíveis: {list(gdf.columns)}")
+            print(f"[-] Column '{id_col}' not found in file.")
+            print(f"    Available columns: {list(gdf.columns)}")
             sys.exit(1)
 
         print("=" * 80)
-        print(f"📋 IMÓVEIS DISPONÍVEIS EM: {os.path.basename(target_file)} ({len(gdf)} registros)")
+        print(f"PROPERTIES AVAILABLE IN: {os.path.basename(target_file)} ({len(gdf)} records)")
         print("=" * 80)
         has_area = 'num_area' in gdf.columns
         has_mun = 'municipio' in gdf.columns
@@ -89,18 +89,18 @@ def main():
             val = row[id_col]
             extra = []
             if has_mun:
-                extra.append(f"Município: {row['municipio']}")
+                extra.append(f"Municipality: {row['municipio']}")
             if has_area:
-                extra.append(f"Área: {row['num_area']:.1f} ha")
+                extra.append(f"Area: {row['num_area']:.1f} ha")
             extra_str = f" ({', '.join(extra)})" if extra else ""
             print(f"  [{idx+1:02d}] {val}{extra_str}")
         print("=" * 80)
-        print(f"💡 Dica: Para processar um imóvel específico, use:")
+        print("Tip: To process a specific property, run:")
         sample_id = gdf[id_col].iloc[0]
         print(f'   python example_run.py --input "{os.path.basename(target_file)}" --id-col "{id_col}" --id-val "{sample_id}"')
         sys.exit(0)
 
-    # Determinar o input target
+    # Determine input target
     if args.coord:
         target = args.coord
     elif args.input:
@@ -120,14 +120,14 @@ def main():
 
     output_dir = os.path.join(parent_dir, args.output_dir) if not os.path.isabs(args.output_dir) else args.output_dir
 
-    # Caso o usuário queira rodar em lote para todos os imóveis (ou um limite)
+    # Batch processing branch
     if args.all or (args.limit is not None and not args.id_val):
         print("=" * 80)
-        print("🚜 EXECUTANDO PROCESSAMENTO EM LOTE (BATCH) - LAPIG")
-        print(f"   Alvo de Entrada: {target}")
-        print(f"   Coluna de ID:    {args.id_col or 'cod_imovel'}")
+        print("EXECUTING BATCH PROCESSING PIPELINE - LAPIG")
+        print(f"   Input Target:     {target}")
+        print(f"   ID Column:        {args.id_col or 'cod_imovel'}")
         if args.limit:
-            print(f"   Limite de Imóveis: {args.limit}")
+            print(f"   Property Limit:   {args.limit}")
         print("=" * 80)
 
         success_gdfs, consolidated_shp = run_batch_analysis_lapig(
@@ -152,24 +152,24 @@ def main():
         )
 
         print("\n" + "=" * 80)
-        print("🎉 PROCESSAMENTO EM LOTE CONCLUÍDO COM SUCESSO!")
-        print(f"📦 Total de imóveis processados: {len(success_gdfs)}")
+        print("BATCH PROCESSING COMPLETED SUCCESSFULLY!")
+        print(f"Total properties processed: {len(success_gdfs)}")
         if consolidated_shp:
-            print(f"💾 Shapefile Geral Pasto:        {consolidated_shp}")
-        print(f"📁 Pastas individuais geradas em: {output_dir}/")
+            print(f"Consolidated Pasture Shapefile: {consolidated_shp}")
+        print(f"Individual result directories in: {output_dir}/")
         print("=" * 80)
         return
 
-    # Execução individual para um único imóvel
+    # Individual property execution branch
     print("=" * 70)
-    print(f"🌾 EXECUTANDO SEGMENTAÇÃO CADASTRAL DE PARCELAS (LAPIG)")
-    print(f"   Alvo de Entrada: {target}")
+    print("EXECUTING CADASTRAL PARCEL SEGMENTATION PIPELINE (LAPIG)")
+    print(f"   Input Target:     {target}")
     if args.id_col:
-        print(f"   Coluna de ID:    {args.id_col}")
+        print(f"   ID Column:        {args.id_col}")
     if args.id_val:
-        print(f"   Filtro ID:       {args.id_val}")
+        print(f"   ID Filter:        {args.id_val}")
     if args.no_pasture:
-        print(f"   Filtro Pasto:    DESATIVADO (Modo Segmentação Pura)")
+        print(f"   Pasture Filter:   DISABLED (Pure Segmentation Mode)")
     print("=" * 70)
 
     filter_tuple = tuple(args.filter) if args.filter else None
@@ -182,7 +182,7 @@ def main():
         start_month=3,
         end_month=10,
         buffer_size=500,
-        folder_name=None, # Cria a subpasta pré-definida com o ID do imóvel!
+        folder_name=None, # Creates a dedicated subfolder with the property ID
         output_base_dir=output_dir,
         model_type="auto",
         min_area_ha=args.min_area,
@@ -197,10 +197,10 @@ def main():
         ee_project=args.project
     )
 
-    print(f"\n🎉 Processo individual concluído com sucesso!")
-    print(f"📦 Shapefile de Segmentação Pura (todos os talhões): {shp_pure} ({len(gdf_pure)} talhões)")
+    print("\nIndividual processing completed successfully!")
+    print(f"Pure Segmentation Shapefile (all parcels):    {shp_pure} ({len(gdf_pure)} parcels)")
     if not args.no_pasture:
-        print(f"💾 Shapefile Final de Pastagem Filtrada:             {shp_pasto} ({len(gdf_pasto)} parcelas)")
+        print(f"Final Filtered Pasture Shapefile:            {shp_pasto} ({len(gdf_pasto)} parcels)")
 
 if __name__ == '__main__':
     main()

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Pipeline Modular de Segmentação e Vetorização Cadastral de Parcelas (LAPIG)
-Substituição definitiva e modularizada do notebook parcelSegmentation_SAMGeo_LAPIG.ipynb
+Modular Cadastral Parcel Segmentation and Vectorization Pipeline (LAPIG)
+Complete modularized replacement for the legacy notebook parcelSegmentation_SAMGeo_LAPIG.ipynb
 
-Suporta execução individual e processamento em lote (Batch Processing para todos os IDs de um arquivo).
+Supports single-property execution and batch processing for all IDs in a vector file.
 """
 
 import os
@@ -16,7 +16,7 @@ import geemap
 import geopandas as gpd
 import pandas as pd
 
-# Suporte a importação relativa dentro de pacote ou importação direta como script
+# Support relative import inside package or direct import as standalone script
 try:
     from .roi_resolver import resolve_input_roi, sanitize_id
     from .s2_mosaic import get_sentinel2_ndvi_mosaic
@@ -54,14 +54,14 @@ except ImportError:
 def run_analysis_lapig(
     roi=None,
     input_target=None,
-    id_column=None,             # Nome da coluna de ID no arquivo vetorial (ex: 'cod_imovel', 'id')
-    id_value=None,              # Valor de ID ou 'all' para rodar todos
+    id_column=None,             # Property ID column name in the vector file (e.g., 'cod_imovel', 'id')
+    id_value=None,              # Specific ID value or 'all' to run all properties
     year=2025,
     start_month=3,
     end_month=10,
     buffer_size=500,
-    folder_name=None,           # Se None ou 'auto': cria pasta pré-definida results/{ID_IMOVEL}
-    output_base_dir="results",  # Diretório base quando folder_name for automático
+    folder_name=None,           # If None or 'auto': creates predefined folder results/{ID_IMOVEL}
+    output_base_dir="results",  # Base directory when folder_name is automatic
     model_type="auto",
     min_area_ha=2.0,
     straight_tol=22.0,
@@ -77,15 +77,15 @@ def run_analysis_lapig(
     ee_project=None
 ):
     """
-    Executa a análise para um imóvel ou delega para lote caso id_value='all'.
-    
-    Novidades:
-    1. Segmentação Pura: Gera 'parcelas_segmentacao_pura_{ID}.shp' contendo todos os talhões
-       físicos no CAR antes de qualquer descarte pelo MapBiomas.
-    2. Benchmark de Hardware: Monitora em segundo plano VRAM (pico/média), RAM do sistema,
-       uso de CPU e GPU compute durante todas as etapas e gera relatório técnico.
+    Executes the segmentation pipeline for a single property or delegates to batch if id_value='all'.
+
+    Key Features:
+    1. Pure Physical Segmentation: Generates 'parcelas_segmentacao_pura_{ID}.shp' containing all
+       physical agricultural parcels within the CAR boundary prior to MapBiomas filtering.
+    2. Hardware Benchmarking: Continuously tracks peak/average VRAM, system RAM, CPU load,
+       and GPU compute load across all pipeline phases, generating a full technical report.
     """
-    # Se id_value for 'all', executa processamento em lote
+    # If id_value is 'all', delegate to batch processing
     if str(id_value).lower() in ['all', '*', 'todos']:
         return run_batch_analysis_lapig(
             input_target=input_target or roi,
@@ -106,21 +106,21 @@ def run_analysis_lapig(
             ee_project=ee_project
         )
 
-    # Garante VRAM limpa antes de iniciar o processamento da parcela
+    # Ensure clean VRAM before starting parcel processing
     clear_gpu_memory()
 
-    # Inicialização do Monitor de Benchmark de Hardware
+    # Initialize Hardware Benchmark Monitor
     monitor = HardwareBenchmarkMonitor(sample_interval=1.0) if (enable_benchmark and HardwareBenchmarkMonitor) else None
     if monitor:
         monitor.start()
-        monitor.set_phase("1. Resolução da Área de Interesse (ROI)")
+        monitor.set_phase("1. Area of Interest (ROI) Resolution")
 
     t_start = time.time()
 
-    # 0. Resolução Universal da Área de Interesse (ROI)
+    # 0. Universal ROI Resolution
     target = input_target if input_target is not None else roi
     if target is None:
-        raise ValueError("❌ Nenhum input_target ou roi fornecido para análise.")
+        raise ValueError("[-] No input_target or roi provided for analysis.")
 
     roi_ee, gdf_car, roi_info = resolve_input_roi(
         input_target=target,
@@ -132,8 +132,8 @@ def run_analysis_lapig(
         ee_project=ee_project
     )
 
-    # 1. Definição Pré-determinada da Pasta de Saída baseada no ID do Imóvel
-    prop_id = roi_info.get("id_imovel") or roi_info.get("cod_imovel") or "imovel_segmentado"
+    # 1. Output Folder Setup based on Property ID
+    prop_id = roi_info.get("id_imovel") or roi_info.get("cod_imovel") or "segmented_property"
     clean_id = sanitize_id(prop_id)
 
     if folder_name is None or str(folder_name).lower() in ["none", "auto", "default"]:
@@ -144,16 +144,16 @@ def run_analysis_lapig(
     os.makedirs(folder_name, exist_ok=True)
 
     print("\n" + "=" * 70)
-    print(f"🚀 PIPELINE DE SEGMENTAÇÃO CADASTRAL LAPIG")
-    print(f"   Imóvel / ID:      {clean_id}")
-    print(f"   Pasta de Saída:   {folder_name}")
-    print(f"   Ano Base:         {year} (Janela seca: meses {start_month:02d} a {end_month:02d})")
-    print(f"   MapBiomas:        Coleção {mapbiomas_collection} (cobertura até 2025)")
+    print("LAPIG CADASTRAL PARCEL SEGMENTATION PIPELINE")
+    print(f"   Property ID:      {clean_id}")
+    print(f"   Output Directory: {folder_name}")
+    print(f"   Target Year:      {year} (Dry season window: months {start_month:02d} to {end_month:02d})")
+    print(f"   MapBiomas:        Collection {mapbiomas_collection} (coverage up to 2025)")
     print("=" * 70)
 
-    # 2. Download do Mosaico Sentinel-2 Multi-temporal (NDVI max, median, min)
+    # 2. Multi-temporal Sentinel-2 Mosaic Download (NDVI max, median, min)
     if monitor:
-        monitor.set_phase("2. Download Mosaico Sentinel-2 (GEE)")
+        monitor.set_phase("2. Sentinel-2 Mosaic Download (GEE)")
 
     s2_tif_path = os.path.join(folder_name, "s2_ndvi_rgb.tif")
     image_ndvis, s2_path, roi_buffered = get_sentinel2_ndvi_mosaic(
@@ -166,9 +166,9 @@ def run_analysis_lapig(
         ee_project=ee_project
     )
 
-    # 3. Segmentação SAMGeo com GPU
+    # 3. SAMGeo GPU Segmentation
     if monitor:
-        monitor.set_phase("3. Inferência SAMGeo (ViT-H GPU)")
+        monitor.set_phase("3. SAMGeo Inference (ViT-H GPU)")
 
     masks_tif_path = os.path.join(folder_name, "masks.tif")
     run_samgeo_segmentation(
@@ -179,9 +179,9 @@ def run_analysis_lapig(
         force_rerun=(not skip_sam_if_exists)
     )
 
-    # 4. Vetorização Cadastral e Retificação de Cercas Retas
+    # 4. Cadastral Vectorization and Straight Fence Regularization
     if monitor:
-        monitor.set_phase("4. Vetorização e Regularização Cadastral (CPU)")
+        monitor.set_phase("4. Vectorization and Cadastral Regularization (CPU)")
 
     gdf_parcels = vectorize_and_straighten_parcels(
         sam_mask_tif=masks_tif_path,
@@ -189,9 +189,9 @@ def run_analysis_lapig(
         straight_tol=straight_tol
     )
 
-    # 5. Segmentação Pura no Limite do CAR (Todos os talhões físicos dentro da fazenda)
+    # 5. Pure Physical Segmentation Clipped to CAR Boundary
     if monitor:
-        monitor.set_phase("5. Segmentação Pura no Perímetro CAR")
+        monitor.set_phase("5. Pure Segmentation Clipped to CAR Boundary")
 
     gdf_pure_car = clip_parcels_by_car(
         gdf_parcels=gdf_parcels,
@@ -201,19 +201,19 @@ def run_analysis_lapig(
     gdf_pure_car['cod_car'] = clean_id
     pure_shp_path = os.path.join(folder_name, f"parcelas_segmentacao_pura_{clean_id}.shp")
 
-    # 6. Classificação Zonal e Filtragem Temática de Pastagem (MapBiomas)
+    # 6. Zonal Classification and Thematic Pasture Filtering (MapBiomas)
     if monitor:
-        monitor.set_phase("6. Classificação Zonal MapBiomas (GEE/CPU)")
+        monitor.set_phase("6. MapBiomas Zonal Classification (GEE/CPU)")
 
     if filter_by_pasture:
-        print(f"\n🌿 Processando classificação zonal de pastagem com MapBiomas ({mapbiomas_collection})...")
+        print(f"\nProcessing pasture zonal classification with MapBiomas ({mapbiomas_collection})...")
         try:
             scale_val = 30 if str(mapbiomas_collection).lower() in ['30', '30m', 'col11'] else 10
             pasture_ee = get_mapbiomas_pasture_ee(roi_ee, year=min(year, 2025), collection=mapbiomas_collection, ee_project=ee_project)
             mb_mask_tif = os.path.join(folder_name, f"temp_mb_mask_{mapbiomas_collection}.tif")
             export_pasture_mask_local(pasture_ee, roi_ee, s2_path, mb_mask_tif, scale=scale_val)
 
-            # Classifica diretamente a segmentação pura do CAR
+            # Classify pure CAR segmentation directly
             gdf_classified, gdf_others = classify_and_filter_pasture_parcels(
                 gdf_parcels=gdf_pure_car,
                 pasture_mask_tif=mb_mask_tif,
@@ -221,12 +221,11 @@ def run_analysis_lapig(
                 s2_ndvi_tif=s2_path
             )
 
-            # Combina pasto e outros para formar a segmentação pura completa anotada (todos os talhões)
-            import pandas as pd
+            # Combine pasture and other parcels to form the fully annotated physical layer
             gdf_all_annotated = pd.concat([gdf_classified, gdf_others], ignore_index=True)
             gdf_all_annotated = gpd.GeoDataFrame(gdf_all_annotated, crs=gdf_classified.crs)
 
-            # Camada 1: Segmentação Pura Completa (com atributos do MapBiomas anotados)
+            # Layer 1: Pure Physical Segmentation (with annotated MapBiomas attributes)
             gdf_pure_clean = gdf_all_annotated.rename(columns={
                 'pasture_cov': 'pasto_cov',
                 'ndvi_median': 'ndvi_med',
@@ -239,26 +238,26 @@ def run_analysis_lapig(
 
             gdf_pure_clean_4326 = gdf_pure_clean.to_crs(epsg=4326)
             gdf_pure_clean_4326.to_file(pure_shp_path)
-            print(f"📦 Shapefile de Segmentação Pura Salvo (Todos os {len(gdf_pure_clean_4326)} talhões): {pure_shp_path}")
+            print(f"Pure Segmentation Shapefile Saved (All {len(gdf_pure_clean_4326)} parcels): {pure_shp_path}")
 
-            # Camada 2: Apenas Parcelas de Pastagem
+            # Layer 2: Validated Pasture Parcels Only
             gdf_pasture = gdf_pure_clean_4326[gdf_pure_clean_4326['is_pasto'] == 1].copy().reset_index(drop=True)
             gdf_pasture['id_parcela'] = range(1, len(gdf_pasture) + 1)
             final_shp_path = os.path.join(folder_name, f"parcelas_finais_cercas_retas_{clean_id}.shp")
             gdf_pasture.to_file(final_shp_path)
-            print(f"💾 Shapefile Final de Pastagem Salvo ({len(gdf_pasture)} parcelas): {final_shp_path}")
+            print(f"Final Filtered Pasture Shapefile Saved ({len(gdf_pasture)} parcels): {final_shp_path}")
 
-            # Camada 3: Não-Pastagem (Auditoria de áreas excluídas: mata, lavoura, etc.)
+            # Layer 3: Non-Pasture Parcels (Audit layer: native vegetation, agriculture, infrastructure)
             gdf_others_clean = gdf_pure_clean_4326[gdf_pure_clean_4326['is_pasto'] == 0].copy().reset_index(drop=True)
             if len(gdf_others_clean) > 0:
                 others_shp = os.path.join(folder_name, "nao_pastagem_auditoria.shp")
                 gdf_others_clean.to_file(others_shp)
-                print(f"📁 Camada de auditoria de não-pastagem salva: {others_shp}")
+                print(f"Non-pasture audit shapefile saved: {others_shp}")
 
             gdf_final_clean_4326 = gdf_pasture
 
         except Exception as e:
-            print(f"⚠️ Aviso na consulta ao MapBiomas: {e}. Mantendo segmentação pura.")
+            print(f"Warning during MapBiomas query: {e}. Retaining pure segmentation.")
             gdf_pure_clean_4326 = gdf_pure_car.to_crs(epsg=4326)
             if 'id_parcela' not in gdf_pure_clean_4326.columns:
                 gdf_pure_clean_4326['id_parcela'] = range(1, len(gdf_pure_clean_4326) + 1)
@@ -266,41 +265,41 @@ def run_analysis_lapig(
             gdf_final_clean_4326 = gdf_pure_clean_4326
             final_shp_path = pure_shp_path
     else:
-        # Sem filtro de pastagem: o resultado final é a própria segmentação pura
+        # Without pasture filter: final result is pure physical segmentation
         gdf_pure_clean_4326 = gdf_pure_car.to_crs(epsg=4326)
         if 'id_parcela' not in gdf_pure_clean_4326.columns:
             gdf_pure_clean_4326['id_parcela'] = range(1, len(gdf_pure_clean_4326) + 1)
         gdf_pure_clean_4326.to_file(pure_shp_path)
         gdf_final_clean_4326 = gdf_pure_clean_4326
         final_shp_path = pure_shp_path
-        print(f"📦 Shapefile de Segmentação Pura Salvo ({len(gdf_pure_clean_4326)} talhões): {pure_shp_path}")
+        print(f"Pure Segmentation Shapefile Saved ({len(gdf_pure_clean_4326)} parcels): {pure_shp_path}")
 
-    # 7. Relatório Estatístico Cadastral
+    # 7. Cadastral Statistical Summary
     if monitor:
-        monitor.set_phase("7. Exportação e Estatísticas Cadastrais")
+        monitor.set_phase("7. Cadastral Statistics & Shapefile Export")
 
-    generate_cadastral_stats(gdf_final_clean_4326, title=f"RELATÓRIO FINAL DE PASTAGEM ({clean_id})")
+    generate_cadastral_stats(gdf_final_clean_4326, title=f"FINAL PASTURE PARCEL REPORT ({clean_id})")
 
-    # 8. Relatório de Benchmark de Hardware
+    # 8. Hardware Benchmark Report
     bench_summary = None
     if monitor:
         bench_summary = monitor.stop()
         txt_path, json_path = monitor.save_report(folder_name, filename_prefix="relatorio_benchmark_hardware")
         print("\n" + monitor.generate_report_text())
-        print(f"📊 Relatório de Hardware salvo em: {txt_path}")
+        print(f"Hardware Benchmark Report saved to: {txt_path}")
 
     total_time = str(timedelta(seconds=int(time.time() - t_start)))
-    print(f"✨ Processamento do imóvel concluído em: {total_time}")
+    print(f"Property processing completed in: {total_time}")
     print("=" * 70 + "\n")
 
-    # Metadados no GeoDataFrame retornado
+    # Metadata attached to returned GeoDataFrame
     gdf_final_clean_4326.attrs['shp_pasture'] = final_shp_path
     gdf_final_clean_4326.attrs['shp_pure'] = pure_shp_path
     gdf_final_clean_4326.attrs['gdf_pure'] = gdf_pure_clean_4326
     if bench_summary:
         gdf_final_clean_4326.attrs['benchmark'] = bench_summary
 
-    # Liberação final de VRAM ao concluir o imóvel
+    # Final VRAM cleanup after completing property
     clear_gpu_memory()
 
     if return_pure:
@@ -311,7 +310,7 @@ def run_batch_analysis_lapig(
     input_target,
     id_column="cod_imovel",
     id_list=None,
-    id_value=None,              # Suporte a ID único ou lista para compatibilidade total
+    id_value=None,              # Support single ID or list for full compatibility
     max_imoveis=None,
     year=2025,
     start_month=3,
@@ -330,36 +329,36 @@ def run_batch_analysis_lapig(
     ee_project=None
 ):
     """
-    Executa o pipeline em lote (batch) para TODOS os imóveis presentes no arquivo vetorial.
-    Gera as pastas individuais de cada imóvel e compila shapefiles consolidados:
-    - parcelas_todos_imoveis_consolidados.shp (pastagem filtrada)
-    - parcelas_todos_imoveis_segmentacao_pura.shp (segmentação física pura de todos os talhões)
-    - relatorio_benchmark_hardware_lote.txt (monitoramento global de hardware)
-    - Liberação contínua de VRAM garantida a cada imóvel processado.
+    Executes the batch pipeline for ALL rural properties present in a vector file.
+    Creates individual property subfolders and compiles consolidated shapefiles:
+    - parcelas_todos_imoveis_consolidados.shp (thematically filtered pasture parcels)
+    - parcelas_todos_imoveis_segmentacao_pura.shp (pure physical segmentation of all parcels)
+    - relatorio_benchmark_hardware_lote.txt (comprehensive hardware tracking)
+    - Enforces continuous VRAM deallocation on every processed property.
     """
     print("\n" + "=" * 80)
-    print(f"🚜 INICIANDO PROCESSAMENTO EM LOTE (BATCH) - LAPIG")
-    print(f"   Arquivo de Entrada: {os.path.basename(str(input_target))}")
-    print(f"   Coluna de ID:       {id_column}")
+    print("STARTING BATCH PROCESSING PIPELINE - LAPIG")
+    print(f"   Input Vector File: {os.path.basename(str(input_target))}")
+    print(f"   Property ID Column: {id_column}")
     print("=" * 80)
 
-    # Suporte a id_value no batch se fornecido
+    # Support id_value in batch mode if provided
     if id_value and not id_list:
         id_list = [id_value] if not isinstance(id_value, (list, tuple, set)) else list(id_value)
 
-    # Ler lista de IDs
+    # Read ID list
     ext = os.path.splitext(str(input_target))[1].lower()
     if ext in ['.parquet', '.geoparquet']:
         gdf_all = gpd.read_parquet(input_target)
     elif os.path.exists(str(input_target)):
         gdf_all = gpd.read_file(input_target)
     else:
-        raise FileNotFoundError(f"Arquivo vetorial não encontrado: {input_target}")
+        raise FileNotFoundError(f"Vector file not found: {input_target}")
 
     if id_column not in gdf_all.columns:
-        raise ValueError(f"Coluna '{id_column}' não encontrada. Colunas disponíveis: {list(gdf_all.columns)}")
+        raise ValueError(f"Column '{id_column}' not found. Available columns: {list(gdf_all.columns)}")
 
-    # Obter IDs únicos
+    # Extract unique IDs
     unique_ids = gdf_all[id_column].dropna().unique().tolist()
     if id_list:
         unique_ids = [i for i in unique_ids if str(i) in [str(x) for x in id_list]]
@@ -367,14 +366,14 @@ def run_batch_analysis_lapig(
         unique_ids = unique_ids[:int(max_imoveis)]
 
     total = len(unique_ids)
-    print(f"📋 Total de imóveis a serem processados: {total}")
+    print(f"Total rural properties to process: {total}")
 
     success_gdfs_pasture = []
     success_gdfs_pure = []
     success_paths = []
     failed_ids = []
 
-    # Monitor de hardware geral do lote
+    # Batch hardware monitor
     batch_monitor = HardwareBenchmarkMonitor(sample_interval=2.0) if (enable_benchmark and HardwareBenchmarkMonitor) else None
     if batch_monitor:
         batch_monitor.start()
@@ -383,14 +382,14 @@ def run_batch_analysis_lapig(
 
     for idx, prop_id in enumerate(unique_ids):
         print("\n" + "#" * 80)
-        print(f"🚜 [{idx+1}/{total}] PROCESSANDO IMÓVEL: {prop_id}")
+        print(f"[{idx+1}/{total}] PROCESSING PROPERTY: {prop_id}")
         print("#" * 80)
 
-        # 🧹 Esvazia a VRAM no início de cada parcela/iteração
+        # Deallocate VRAM at the start of each property
         clear_gpu_memory(verbose=True)
 
         if batch_monitor:
-            batch_monitor.set_phase(f"Imóvel [{idx+1}/{total}] {prop_id}")
+            batch_monitor.set_phase(f"Property [{idx+1}/{total}] {prop_id}")
 
         try:
             gdf_res, shp_res, gdf_pure_res, shp_pure_res = run_analysis_lapig(
@@ -401,7 +400,7 @@ def run_batch_analysis_lapig(
                 start_month=start_month,
                 end_month=end_month,
                 buffer_size=buffer_size,
-                folder_name=None, # Usa subpasta results/{prop_id}
+                folder_name=None, # Automatically uses subfolder results/{prop_id}
                 output_base_dir=output_base_dir,
                 model_type=model_type,
                 min_area_ha=min_area_ha,
@@ -418,67 +417,67 @@ def run_batch_analysis_lapig(
             success_gdfs_pure.append(gdf_pure_res)
             success_paths.append(shp_res)
         except Exception as e:
-            print(f"❌ Erro ao processar o imóvel {prop_id}: {e}")
+            print(f"[-] Error processing property {prop_id}: {e}")
             failed_ids.append((prop_id, str(e)))
         finally:
-            # 🧹 Esvazia a VRAM compulsoriamente ao final de cada parcela/iteração
+            # Force VRAM deallocation at the end of each property
             clear_gpu_memory(verbose=True)
 
-    # Compilar Shapefiles Consolidados se solicitado
+    # Compile Consolidated Shapefiles if requested
     consolidated_pasture_path = None
     consolidated_pure_path = None
 
     if consolidate_shp:
-        # 1. Shapefile Consolidado de Pastagem
+        # 1. Consolidated Pasture Shapefile
         if success_gdfs_pasture:
             try:
                 gdf_consolidated_pasto = pd.concat(success_gdfs_pasture, ignore_index=True)
                 gdf_consolidated_pasto = gpd.GeoDataFrame(gdf_consolidated_pasto, geometry='geometry', crs=success_gdfs_pasture[0].crs)
                 consolidated_pasture_path = os.path.join(output_base_dir, "parcelas_todos_imoveis_consolidados.shp")
                 gdf_consolidated_pasto.to_file(consolidated_pasture_path)
-                print(f"\n📦 Shapefile Consolidado de Pastagem Salvo: {consolidated_pasture_path}")
+                print(f"\nConsolidated Pasture Shapefile Saved: {consolidated_pasture_path}")
             except Exception as e:
-                print(f"⚠️ Não foi possível consolidar shapefile de pasto: {e}")
+                print(f"Warning: Could not consolidate pasture shapefile: {e}")
 
-        # 2. Shapefile Consolidado de Segmentação Pura (Todos os talhões físicos)
+        # 2. Consolidated Pure Physical Segmentation Shapefile (All agricultural parcels)
         if success_gdfs_pure:
             try:
                 gdf_consolidated_pure = pd.concat(success_gdfs_pure, ignore_index=True)
                 gdf_consolidated_pure = gpd.GeoDataFrame(gdf_consolidated_pure, geometry='geometry', crs=success_gdfs_pure[0].crs)
                 consolidated_pure_path = os.path.join(output_base_dir, "parcelas_todos_imoveis_segmentacao_pura.shp")
                 gdf_consolidated_pure.to_file(consolidated_pure_path)
-                print(f"📦 Shapefile Consolidado de Segmentação Pura Salvo: {consolidated_pure_path}")
+                print(f"Consolidated Pure Segmentation Shapefile Saved: {consolidated_pure_path}")
             except Exception as e:
-                print(f"⚠️ Não foi possível consolidar shapefile de segmentação pura: {e}")
+                print(f"Warning: Could not consolidate pure segmentation shapefile: {e}")
 
-    # Relatório Final do Batch & Benchmark
+    # Final Batch & Benchmark Report
     if batch_monitor:
         batch_monitor.stop()
         batch_txt, batch_json = batch_monitor.save_report(output_base_dir, filename_prefix="relatorio_benchmark_hardware_lote")
         print("\n" + batch_monitor.generate_report_text())
-        print(f"📊 Relatório de Hardware do Lote salvo em: {batch_txt}")
+        print(f"Batch Hardware Report saved to: {batch_txt}")
 
     elapsed = str(timedelta(seconds=int(time.time() - t_batch_start)))
     print("\n" + "=" * 80)
-    print("🏁 RELATÓRIO DO PROCESSAMENTO EM LOTE (BATCH)")
+    print("BATCH PROCESSING FINAL REPORT")
     print("=" * 80)
-    print(f"🔹 Total de imóveis no lote:       {total}")
-    print(f"🔹 Concluídos com sucesso:         {len(success_gdfs_pasture)}")
-    print(f"🔹 Falhas / Erros:                 {len(failed_ids)}")
-    print(f"⏱️ Tempo total de processamento:   {elapsed}")
+    print(f"  Total properties in batch:        {total}")
+    print(f"  Successfully processed:           {len(success_gdfs_pasture)}")
+    print(f"  Failed / Errors:                  {len(failed_ids)}")
+    print(f"  Total processing time:            {elapsed}")
     if consolidated_pasture_path:
         total_pasto_ha = sum([g['area_ha'].sum() for g in success_gdfs_pasture if 'area_ha' in g.columns])
         total_parcelas = sum([len(g) for g in success_gdfs_pasture])
-        print(f"📊 Total de parcelas validadas:   {total_parcelas} ({total_pasto_ha:.2f} ha)")
-        print(f"💾 Shapefile Consolidado:         {consolidated_pasture_path}")
+        print(f"  Total validated pasture parcels:  {total_parcelas} ({total_pasto_ha:.2f} ha)")
+        print(f"  Consolidated Pasture Shapefile:   {consolidated_pasture_path}")
     if consolidated_pure_path:
         total_puro_ha = sum([g['area_ha'].sum() for g in success_gdfs_pure if 'area_ha' in g.columns])
         total_talhoes = sum([len(g) for g in success_gdfs_pure])
-        print(f"📊 Total talhões físicos (puro):   {total_talhoes} ({total_puro_ha:.2f} ha)")
-        print(f"💾 Shapefile Puro Consolidado:     {consolidated_pure_path}")
+        print(f"  Total physical parcels (pure):    {total_talhoes} ({total_puro_ha:.2f} ha)")
+        print(f"  Consolidated Pure Shapefile:      {consolidated_pure_path}")
     print("=" * 80 + "\n")
 
     return success_gdfs_pasture, consolidated_pasture_path
 
 if __name__ == '__main__':
-    print("Pipeline de segmentação cadastral pronto para execução.")
+    print("Cadastral parcel segmentation pipeline ready for execution.")

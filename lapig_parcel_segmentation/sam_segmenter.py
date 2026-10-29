@@ -1,6 +1,6 @@
 """
-Módulo 2: Segmentação SAMGeo com Gerenciamento Inteligente de GPU (CUDA)
-LAPIG - Laboratório de Processamento de Imagens e Geoprocessamento
+Module 2: SAMGeo Segmentation with Intelligent GPU (CUDA) Memory Management
+LAPIG - Image Processing and Geoprocessing Laboratory
 """
 
 import os
@@ -11,10 +11,10 @@ import torch
 
 def clear_gpu_memory(verbose=False):
     """
-    Libera completamente a memória de vídeo (VRAM) e cache do PyTorch CUDA.
-    1. Força a coleta de lixo de objetos Python desacoplados (gc.collect).
-    2. Esvazia o cache alocado pelo caching allocator do CUDA (torch.cuda.empty_cache).
-    3. Coleta blocos IPC compartilhados (torch.cuda.ipc_collect).
+    Completely flushes video memory (VRAM) and PyTorch CUDA cache.
+    1. Forces garbage collection of unreferenced Python objects (gc.collect).
+    2. Empties cached blocks from CUDA caching allocator (torch.cuda.empty_cache).
+    3. Collects shared IPC memory blocks (torch.cuda.ipc_collect).
     """
     gc.collect()
     if torch.cuda.is_available():
@@ -25,12 +25,12 @@ def clear_gpu_memory(verbose=False):
             try:
                 vram_mb = torch.cuda.memory_allocated() / (1024**2)
                 res_mb = torch.cuda.memory_reserved() / (1024**2)
-                print(f"🧹 [VRAM Clean] Memória GPU liberada: Alocada={vram_mb:.1f} MB | Reservada={res_mb:.1f} MB")
+                print(f"[VRAM Clean] GPU Memory released: Allocated={vram_mb:.1f} MB | Reserved={res_mb:.1f} MB")
             except Exception:
                 pass
 
 def get_gpu_info():
-    """Retorna informações da GPU disponível para o usuário."""
+    """Returns available GPU diagnostic information."""
     if not torch.cuda.is_available():
         return {"available": False, "name": "CPU", "vram_gb": 0.0}
     device_id = torch.cuda.current_device()
@@ -41,38 +41,38 @@ def get_gpu_info():
 
 def run_samgeo_segmentation(image_path, output_mask_path, model_type='auto', checkpoint_dir='models', force_rerun=False):
     """
-    Executa a segmentação de parcelas com o Segment Anything Model for Geospatial (SAMGeo).
-    
-    Gerenciamento automático de hardware:
-    - RTX 2080 Ti (11GB): Roda ViT-H ou ViT-L com folga.
-    - RTX 3060 Ti (8GB): Roda ViT-H otimizado ou ViT-B.
-    - Purga completa de VRAM garantida ao término de cada execução.
+    Executes parcel segmentation using Segment Anything Model for Geospatial (SAMGeo).
+
+    Automated hardware adaptation:
+    - RTX 2080 Ti (11GB): Runs ViT-H or ViT-L with high headroom.
+    - RTX 3060 Ti (8GB): Runs ViT-H with calibrated batch size or ViT-B.
+    - Guaranteed zero-leak VRAM deallocation upon completion of each run.
     """
-    # Garante VRAM limpa antes de qualquer verificação
+    # Ensure clean VRAM prior to any operation
     clear_gpu_memory()
 
     if os.path.exists(output_mask_path) and os.path.getsize(output_mask_path) > 1000 and not force_rerun:
-        print(f"ℹ️ Máscara do SAMGeo já existente: {output_mask_path}. Pulando inferência.")
+        print(f"SAMGeo mask already exists: {output_mask_path}. Skipping inference.")
         clear_gpu_memory()
         return output_mask_path
 
     if not os.path.exists(image_path):
-        raise FileNotFoundError(f"❌ Imagem de entrada não encontrada: {image_path}")
+        raise FileNotFoundError(f"[-] Input image not found: {image_path}")
 
     gpu_info = get_gpu_info()
-    print(f"\n🔍 Diagnóstico de Hardware:")
-    print(f"   Dispositivo: {gpu_info['name']}")
+    print(f"\nHardware Diagnostic:")
+    print(f"   Device:      {gpu_info['name']}")
     if gpu_info['available']:
-        print(f"   VRAM Total:  {gpu_info['vram_gb']:.2f} GB")
+        print(f"   Total VRAM:  {gpu_info['vram_gb']:.2f} GB")
     else:
-        print("   ⚠️ CUDA não disponível. Rodando na CPU (pode ser lento).")
+        print("   Warning: CUDA not available. Running on CPU (inference may be slow).")
 
-    # Seleção automática de modelo se solicitado
+    # Automated architecture selection
     if model_type == 'auto':
         if gpu_info['vram_gb'] >= 10.0:
             chosen_model = 'vit_h'
         elif gpu_info['vram_gb'] >= 7.5:
-            # RTX 3060 Ti (8GB): Suporta ViT-H com batch calibrado
+            # RTX 3060 Ti (8GB): ViT-H with calibrated batch size
             chosen_model = 'vit_h'
         elif gpu_info['vram_gb'] >= 5.0:
             chosen_model = 'vit_l'
@@ -81,10 +81,10 @@ def run_samgeo_segmentation(image_path, output_mask_path, model_type='auto', che
     else:
         chosen_model = model_type
 
-    print(f"🚀 Inicializando SAMGeo com arquitetura: {chosen_model.upper()}...")
+    print(f"Initializing SAMGeo with architecture: {chosen_model.upper()}...")
 
-    # Parâmetros calibrados pelo Vinícius (LAPIG Setup) para detecção de lances de cerca sutis
-    # Ajustamos points_per_batch para 64 para garantir margem de segurança contra estouro de VRAM na 3060 Ti
+    # Calibrated parameters (LAPIG Setup) for subtle fence line detection
+    # points_per_batch set to 64 to ensure safety margin against VRAM overflow on 8GB cards
     batch_size = 64 if gpu_info['vram_gb'] < 10.0 else 128
 
     sam_kwargs = {
@@ -100,7 +100,7 @@ def run_samgeo_segmentation(image_path, output_mask_path, model_type='auto', che
         'box_nms_thresh': 0.5,
     }
 
-    # Suprime avisos do OpenCV/libtiff ao ler tags cartográficas de GeoTIFF (33550, 33922, 34735, 34737)
+    # Suppress OpenCV/libtiff warnings when reading GeoTIFF cartographic tags (33550, 33922, 34735, 34737)
     os.environ['OPENCV_LOG_LEVEL'] = 'ERROR'
     try:
         import cv2
@@ -123,13 +123,13 @@ def run_samgeo_segmentation(image_path, output_mask_path, model_type='auto', che
             sam_kwargs=sam_kwargs
         )
 
-        print(f"⏳ Processando segmentação em: {os.path.basename(image_path)}...")
+        print(f"Processing parcel segmentation on: {os.path.basename(image_path)}...")
         sam.generate(image_path, output=output_mask_path, foreground=True, unique=True)
         elapsed = str(timedelta(seconds=int(time.time() - t0)))
-        print(f"✅ Segmentação concluída com sucesso em {elapsed}!")
-        print(f"📁 Máscara raster salva em: {output_mask_path}")
+        print(f"Segmentation completed successfully in {elapsed}!")
+        print(f"Raster mask saved to: {output_mask_path}")
     finally:
-        # Desvinculação forçada e exclusão de referências para liberação de VRAM
+        # Explicit unbinding and reference deletion for complete VRAM deallocation
         if sam is not None:
             try:
                 if hasattr(sam, 'mask_generator'):
@@ -142,7 +142,7 @@ def run_samgeo_segmentation(image_path, output_mask_path, model_type='auto', che
                 pass
             del sam
 
-        # Esvazia a VRAM imediatamente para que as etapas seguintes e próximas parcelas comecem limpas
+        # Immediately flush VRAM so subsequent steps and batches start clean
         clear_gpu_memory(verbose=True)
 
     return output_mask_path

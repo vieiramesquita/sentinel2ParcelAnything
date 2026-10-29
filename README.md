@@ -191,8 +191,8 @@ Vectorization_Pro/
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/vieiramesquita/sentinel2parcel.git
-cd sentinel2parcel
+git clone https://github.com/vieiramesquita/sentinel2ParcelAnything.git
+cd sentinel2ParcelAnything
 
 # 2. Create and activate a Python virtual environment
 python -m venv venv

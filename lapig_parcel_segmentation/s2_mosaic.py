@@ -1,7 +1,7 @@
 """
-Módulo 1: Download e Processamento Sentinel-2 via Google Earth Engine
-Coleção Sentinel-2 Harmonized + Cloud Score Plus (CS+)
-LAPIG - Laboratório de Processamento de Imagens e Geoprocessamento
+Module 1: Sentinel-2 Download and Multi-Temporal Processing via Google Earth Engine
+Sentinel-2 Harmonized Collection + Cloud Score Plus (CS+)
+LAPIG - Image Processing and Geoprocessing Laboratory
 """
 
 import os
@@ -9,7 +9,7 @@ import ee
 import geemap
 
 def is_ee_initialized():
-    """Verifica se o Earth Engine já foi inicializado na sessão atual."""
+    """Checks whether Earth Engine has already been initialized in the current session."""
     try:
         return ee.data._credentials is not None
     except Exception:
@@ -17,13 +17,13 @@ def is_ee_initialized():
 
 def initialize_earth_engine(project=None):
     """
-    Inicializa o Earth Engine respeitando a sessão ativa do usuário.
-    Se já estiver inicializado e nenhum projeto diferente for forçado, mantém a sessão ativa.
+    Initializes Earth Engine honoring the user's active session.
+    If already initialized and no specific project is forced, retains active session.
     """
     if is_ee_initialized() and (project is None or str(project).lower() in ['none', 'auto', 'default']):
         return
 
-    # Se um projeto foi explicitamente fornecido
+    # If explicit project provided
     if project and str(project).lower() not in ['none', 'auto', 'default']:
         try:
             ee.Initialize(project=project)
@@ -31,14 +31,14 @@ def initialize_earth_engine(project=None):
         except Exception:
             pass
 
-    # Tenta inicialização padrão do ambiente do usuário
+    # Attempt standard user environment initialization
     try:
         ee.Initialize()
         return
     except Exception:
         pass
 
-    # Variável de ambiente EE_PROJECT
+    # Check EE_PROJECT environment variable
     env_p = os.environ.get('EE_PROJECT') or os.environ.get('EARTHENGINE_PROJECT')
     if env_p:
         try:
@@ -47,7 +47,7 @@ def initialize_earth_engine(project=None):
         except Exception:
             pass
 
-    # Fallback
+    # Fallback initialization
     try:
         ee.Initialize(project='ee-vieiramesquita')
     except Exception:
@@ -55,16 +55,16 @@ def initialize_earth_engine(project=None):
 
 def get_sentinel2_ndvi_mosaic(roi_ee, year, start_month=3, end_month=10, buffer_meters=500, output_path=None, ee_project=None):
     """
-    Gera o mosaico multi-temporal de estatísticas de NDVI [max, median, min]
-    com máscara de nuvens Cloud Score Plus (cs_cdf >= 0.65).
-    
-    Retorna:
-      image_ndvis: ee.Image com as bandas ['NDVI_max', 'NDVI_median', 'NDVI_min']
-      outpath: caminho local do arquivo GeoTIFF gerado
-      roi_buffered: geometria expandida com o buffer
+    Generates multi-temporal NDVI statistical composite [max, median, min]
+    with Cloud Score Plus cloud/shadow masking (cs_cdf >= 0.65).
+
+    Returns:
+      image_ndvis: ee.Image with bands ['NDVI_max', 'NDVI_median', 'NDVI_min']
+      output_path: local filesystem path of exported GeoTIFF
+      roi_buffered: expanded buffered geometry
     """
     initialize_earth_engine(project=ee_project)
-    
+
     roi_buffered = roi_ee.geometry().buffer(buffer_meters).bounds()
     coords = roi_buffered.getInfo()['coordinates'][0]
     bbox = [coords[0][0], coords[0][1], coords[2][0], coords[2][1]]
@@ -95,7 +95,7 @@ def get_sentinel2_ndvi_mosaic(roi_ee, year, start_month=3, end_month=10, buffer_
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
 
     if not os.path.exists(output_path) or os.path.getsize(output_path) < 1000:
-        print(f"🛰️ Exportando mosaico NDVI Sentinel-2 para: {output_path}...")
+        print(f"Exporting Sentinel-2 NDVI mosaic to: {output_path}...")
         geemap.ee_to_geotiff(
             image_ndvis,
             output_path,
@@ -103,8 +103,8 @@ def get_sentinel2_ndvi_mosaic(roi_ee, year, start_month=3, end_month=10, buffer_
             zoom=14,
             vis_params={'min': [0.3, 0.15, 0.1], 'max': [0.9, 0.9, 0.7], 'bands': ['NDVI_max', 'NDVI_median', 'NDVI_min']}
         )
-        print("✅ Download do mosaico S2 concluído!")
+        print("Sentinel-2 mosaic download completed!")
     else:
-        print(f"ℹ️ Mosaico S2 já existe localmente: {output_path}")
+        print(f"Sentinel-2 mosaic already exists locally: {output_path}")
 
     return image_ndvis, output_path, roi_buffered

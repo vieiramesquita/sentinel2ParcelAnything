@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Módulo de Geração do Dashboard Interativo de Hardware e Performance - LAPIG
-Coleta todos os relatórios JSON e Shapefiles na pasta results/ e gera um dashboard HTML ultra-moderno.
+Interactive Hardware and Performance Dashboard Generator - LAPIG
+Gathers all benchmark JSON reports and Shapefiles in results/ and generates a modern HTML dashboard.
 """
 
 import os
@@ -23,7 +23,7 @@ except ImportError:
     pd = None
 
 def _read_dbf_summary(dbf_path):
-    """Lê estatísticas básicas (contagem e soma da área) diretamente do DBF sem geopandas."""
+    """Reads basic statistics (count and area sum) directly from DBF without geopandas."""
     if not os.path.exists(dbf_path):
         return 0, 0.0
     try:
@@ -36,13 +36,13 @@ def _read_dbf_summary(dbf_path):
                 name = name.replace(b'\x00', b'').decode('latin1').lower()
                 fields.append((name, typ.decode('latin1'), size, deci))
             f.seek(lenheader)
-            
+
             area_idx = None
             for idx, (fname, _, _, _) in enumerate(fields):
                 if 'area' in fname:
                     area_idx = idx
                     break
-                    
+
             tot_area = 0.0
             valid_recs = 0
             for _ in range(numrec):
@@ -65,7 +65,7 @@ def _read_dbf_summary(dbf_path):
         return 0, 0.0
 
 def collect_benchmark_dataset(results_dir="results", gpkg_path="car_goias_area_imovel_epsg4674_hottest.gpkg"):
-    """Varre todas as pastas de resultados e compila um dataset enriquecido."""
+    """Scans all results directories and compiles an enriched benchmark dataset."""
     car_dict = {}
     if os.path.exists(gpkg_path):
         if gpd is not None:
@@ -77,7 +77,7 @@ def collect_benchmark_dataset(results_dir="results", gpkg_path="car_goias_area_i
                         'num_area': float(row.get('num_area', 0.0))
                     }
             except Exception as e:
-                print(f"Aviso ao ler GPKG com geopandas: {e}")
+                print(f"Notice reading GPKG with geopandas: {e}")
         else:
             try:
                 conn = sqlite3.connect(gpkg_path)
@@ -90,9 +90,9 @@ def collect_benchmark_dataset(results_dir="results", gpkg_path="car_goias_area_i
                     }
                 conn.close()
             except Exception as e:
-                print(f"Aviso ao ler GPKG via sqlite3: {e}")
+                print(f"Notice reading GPKG via sqlite3: {e}")
 
-    # Fallbacks conhecidos de imóveis de teste
+    # Fallbacks for known test properties
     car_dict['MS-5006309-8DC93A48C2424FD7B3EDF235F8B531E1'] = {'municipio': 'Paranaíba (MS)', 'num_area': 1085.22}
     car_dict['GO-5211008-46C08C6235D74D36BE07B5384A17B156'] = {'municipio': 'Itapirapuã (GO)', 'num_area': 193.59}
 
@@ -115,7 +115,7 @@ def collect_benchmark_dataset(results_dir="results", gpkg_path="car_goias_area_i
         except Exception:
             continue
 
-        # Inspecionar shapefiles para obter contagens reais
+        # Inspect shapefiles to retrieve counts
         pasto_shps = glob.glob(os.path.join(folder_path, "parcelas_finais_cercas_retas_*.shp")) or glob.glob(os.path.join(folder_path, "piquetes_finais_cercas_retas_*.shp"))
         puro_shps = glob.glob(os.path.join(folder_path, "parcelas_segmentacao_pura_*.shp")) or glob.glob(os.path.join(folder_path, "piquetes_segmentacao_pura_*.shp"))
 
@@ -164,6 +164,24 @@ def collect_benchmark_dataset(results_dir="results", gpkg_path="car_goias_area_i
 
         tot_sec = round(float(bench.get('total_duration_sec', 0.0)), 2)
 
+        # Map phase durations supporting both English and Portuguese phase names
+        sam_dur = (
+            phases_map.get('3. SAMGeo Inference (ViT-H GPU)', 0.0) or
+            phases_map.get('3. Inferência SAMGeo (ViT-H GPU)', 0.0)
+        )
+        vec_dur = (
+            phases_map.get('4. Vectorization and Cadastral Regularization (CPU)', 0.0) or
+            phases_map.get('4. Vetorização e Regularização Cadastral (CPU)', 0.0)
+        )
+        s2_dur = (
+            phases_map.get('2. Sentinel-2 Mosaic Download (GEE)', 0.0) or
+            phases_map.get('2. Download Mosaico Sentinel-2 (GEE)', 0.0)
+        )
+        mb_dur = (
+            phases_map.get('6. MapBiomas Zonal Classification (GEE/CPU)', 0.0) or
+            phases_map.get('6. Classificação Zonal MapBiomas (GEE/CPU)', 0.0)
+        )
+
         record = {
             "id": folder_name,
             "municipio": mun,
@@ -188,10 +206,10 @@ def collect_benchmark_dataset(results_dir="results", gpkg_path="car_goias_area_i
             "ram_peak_proc_gb": round(float(ram_data.get('peak_proc_ram_gb', 0.0)), 2),
             "cpu_util_avg": round(float(cpu_data.get('avg_pct', 0.0)), 1),
             "cpu_util_peak": round(float(cpu_data.get('peak_pct', 0.0)), 1),
-            "sam_duration_sec": phases_map.get('3. Inferência SAMGeo (ViT-H GPU)', 0.0),
-            "vectorize_duration_sec": phases_map.get('4. Vetorização e Regularização Cadastral (CPU)', 0.0),
-            "s2_download_sec": phases_map.get('2. Download Mosaico Sentinel-2 (GEE)', 0.0),
-            "mapbiomas_sec": phases_map.get('6. Classificação Zonal MapBiomas (GEE/CPU)', 0.0),
+            "sam_duration_sec": sam_dur,
+            "vectorize_duration_sec": vec_dur,
+            "s2_download_sec": s2_dur,
+            "mapbiomas_sec": mb_dur,
             "phases": phases_map
         }
         records.append(record)
@@ -199,10 +217,10 @@ def collect_benchmark_dataset(results_dir="results", gpkg_path="car_goias_area_i
     return records
 
 def generate_dashboard_html(records, output_html_path="results/dashboard_benchmark.html"):
-    """Gera o arquivo HTML standalone com visual moderno, KPIs e gráficos Plotly.js."""
+    """Generates standalone HTML file with modern design, KPIs, and Plotly.js charts."""
     records_json = json.dumps(records, ensure_ascii=False, indent=2)
 
-    # Cálculos para os KPIs agregados
+    # Aggregated KPI computations
     total_props = len(records)
     total_area_ha = sum(r['car_area_ha'] for r in records)
     total_paddocks = sum(r['paddocks_count'] for r in records)
@@ -213,11 +231,11 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
     avg_total_sec = round(sum(r['total_sec'] for r in records) / total_props, 1) if total_props else 0
 
     html_content = f"""<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LAPIG - Dashboard de Performance de Hardware & Vetorização Cadastral</title>
+    <title>LAPIG - Hardware Performance & Cadastral Vectorization Dashboard</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -234,11 +252,11 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             --bg-card-hover: rgba(26, 35, 56, 0.85);
             --border-subtle: rgba(255, 255, 255, 0.08);
             --border-active: rgba(0, 242, 254, 0.4);
-            
+
             --text-primary: #f1f5f9;
             --text-secondary: #94a3b8;
             --text-muted: #64748b;
-            
+
             --neon-cyan: #00f2fe;
             --neon-blue: #3b82f6;
             --neon-purple: #a855f7;
@@ -246,11 +264,11 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             --neon-emerald: #10b981;
             --neon-amber: #f59e0b;
             --neon-rose: #f43f5e;
-            
+
             --font-sans: 'Plus Jakarta Sans', sans-serif;
             --font-heading: 'Outfit', sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
-            
+
             --radius-md: 12px;
             --radius-lg: 18px;
             --shadow-glow: 0 8px 32px 0 rgba(0, 242, 254, 0.07);
@@ -264,7 +282,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
 
         body {{
             background-color: var(--bg-base);
-            background-image: 
+            background-image:
                 radial-gradient(circle at 10% 20%, rgba(0, 242, 254, 0.04) 0%, transparent 40%),
                 radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.04) 0%, transparent 40%),
                 linear-gradient(180deg, #07090e 0%, #0a0e17 100%);
@@ -384,43 +402,40 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
 
         .kpi-title {{
             display: flex;
-            align-items: center;
             justify-content: space-between;
-            font-size: 0.8rem;
+            align-items: center;
+            font-size: 0.82rem;
             font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
             color: var(--text-secondary);
-            margin-bottom: 8px;
+            margin-bottom: 10px;
         }}
 
         .kpi-value {{
             font-family: var(--font-heading);
             font-size: 1.85rem;
-            font-weight: 700;
+            font-weight: 800;
+            letter-spacing: -0.02em;
             color: #ffffff;
-            line-height: 1.2;
             margin-bottom: 4px;
         }}
 
         .kpi-subtext {{
-            font-size: 0.78rem;
+            font-size: 0.76rem;
             color: var(--text-muted);
         }}
 
-        /* Controls & Filter Bar */
+        /* Filter & Search Bar */
         .filter-bar {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 14px;
             background: var(--bg-card);
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-md);
             padding: 14px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-            flex-wrap: wrap;
             margin-bottom: 24px;
-            backdrop-filter: blur(16px);
+            flex-wrap: wrap;
         }}
 
         .filter-pills {{
@@ -433,8 +448,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             background: rgba(255, 255, 255, 0.04);
             border: 1px solid var(--border-subtle);
             color: var(--text-secondary);
-            font-family: var(--font-sans);
-            font-size: 0.82rem;
+            font-size: 0.8rem;
             font-weight: 500;
             padding: 6px 14px;
             border-radius: 999px;
@@ -442,10 +456,17 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             transition: all 0.2s ease;
         }}
 
-        .pill-btn:hover, .pill-btn.active {{
-            background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(168, 85, 247, 0.2));
-            border-color: var(--neon-cyan);
+        .pill-btn:hover {{
             color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.08);
+        }}
+
+        .pill-btn.active {{
+            background: rgba(0, 242, 254, 0.12);
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+            font-weight: 600;
         }}
 
         .search-box {{
@@ -668,13 +689,13 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             </div>
             <div class="brand-text">
                 <h1>LAPIG Performance Intelligence Dashboard</h1>
-                <p>Análise de Hardware, VRAM, Térmicas e Eficiência Cadastral (Sentinel-2 + SAMGeo ViT-H)</p>
+                <p>Hardware Analysis, VRAM, Thermal & Cadastral Efficiency (Sentinel-2 + SAMGeo ViT-H)</p>
             </div>
         </div>
         <div class="header-meta">
             <span class="badge highlight"><i data-lucide="zap" style="width: 14px; height: 14px;"></i> RTX 2080 Ti (11 GB)</span>
-            <span class="badge"><i data-lucide="layers" style="width: 14px; height: 14px;"></i> {total_props} Imóveis Monitorados</span>
-            <span class="badge"><i data-lucide="shield-check" style="width: 14px; height: 14px;"></i> Zero VRAM Leak Validado</span>
+            <span class="badge"><i data-lucide="layers" style="width: 14px; height: 14px;"></i> {total_props} Monitored Properties</span>
+            <span class="badge"><i data-lucide="shield-check" style="width: 14px; height: 14px;"></i> Zero VRAM Leak Validated</span>
         </div>
     </header>
 
@@ -682,110 +703,110 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
     <section class="kpi-grid">
         <div class="kpi-card" style="--card-accent: var(--neon-cyan);">
             <div class="kpi-title">
-                <span>Imóveis Monitorados</span>
+                <span>Monitored Properties</span>
                 <i data-lucide="map" style="width: 16px; height: 16px; color: var(--neon-cyan);"></i>
             </div>
             <div class="kpi-value">{total_props}</div>
-            <div class="kpi-subtext">Propriedades rurais cadastradas</div>
+            <div class="kpi-subtext">Registered rural properties</div>
         </div>
 
         <div class="kpi-card" style="--card-accent: var(--neon-emerald);">
             <div class="kpi-title">
-                <span>Área Total no CAR</span>
+                <span>Total CAR Area</span>
                 <i data-lucide="maximize" style="width: 16px; height: 16px; color: var(--neon-emerald);"></i>
             </div>
             <div class="kpi-value">{total_area_ha:,.1f} <span style="font-size: 1rem; font-weight: 500; color: var(--text-muted);">ha</span></div>
-            <div class="kpi-subtext">Média: {(total_area_ha / max(1, total_props)):.1f} ha / fazenda</div>
+            <div class="kpi-subtext">Mean: {(total_area_ha / max(1, total_props)):.1f} ha / property</div>
         </div>
 
         <div class="kpi-card" style="--card-accent: var(--neon-blue);">
             <div class="kpi-title">
-                <span>Parcelas Cadastrais</span>
+                <span>Cadastral Parcels</span>
                 <i data-lucide="grid" style="width: 16px; height: 16px; color: var(--neon-blue);"></i>
             </div>
             <div class="kpi-value">{total_paddocks:,}</div>
-            <div class="kpi-subtext">Retificados com 0 sobreposições</div>
+            <div class="kpi-subtext">Rectified with 0 overlaps</div>
         </div>
 
         <div class="kpi-card" style="--card-accent: var(--neon-purple);">
             <div class="kpi-title">
-                <span>Pico VRAM Reservada</span>
+                <span>Peak Reserved VRAM</span>
                 <i data-lucide="hard-drive" style="width: 16px; height: 16px; color: var(--neon-purple);"></i>
             </div>
             <div class="kpi-value">{max_vram_res:.2f} <span style="font-size: 1rem; font-weight: 500; color: var(--text-muted);">GB</span></div>
-            <div class="kpi-subtext">Alocada real máx: {max_vram_alloc:.2f} GB</div>
+            <div class="kpi-subtext">Peak real alloc: {max_vram_alloc:.2f} GB</div>
         </div>
 
         <div class="kpi-card" style="--card-accent: var(--neon-rose);">
             <div class="kpi-title">
-                <span>Temperatura Máx GPU</span>
+                <span>Max GPU Temperature</span>
                 <i data-lucide="thermometer" style="width: 16px; height: 16px; color: var(--neon-rose);"></i>
             </div>
             <div class="kpi-value">{max_temp} <span style="font-size: 1rem; font-weight: 500; color: var(--text-muted);">°C</span></div>
-            <div class="kpi-subtext">Média térmica de pico: {avg_temp:.1f} °C</div>
+            <div class="kpi-subtext">Peak thermal average: {avg_temp:.1f} °C</div>
         </div>
 
         <div class="kpi-card" style="--card-accent: var(--neon-amber);">
             <div class="kpi-title">
-                <span>Tempo Médio / Imóvel</span>
+                <span>Average Time / Property</span>
                 <i data-lucide="clock" style="width: 16px; height: 16px; color: var(--neon-amber);"></i>
             </div>
             <div class="kpi-value">{(avg_total_sec / 60.0):.1f} <span style="font-size: 1rem; font-weight: 500; color: var(--text-muted);">min</span></div>
-            <div class="kpi-subtext">{avg_total_sec:.1f}s por propriedade</div>
+            <div class="kpi-subtext">{avg_total_sec:.1f}s per property</div>
         </div>
     </section>
 
     <!-- Filter & Search Bar -->
     <section class="filter-bar">
         <div class="filter-pills">
-            <button class="pill-btn active" onclick="applyPreset('all')">Todos ({total_props})</button>
-            <button class="pill-btn" onclick="applyPreset('large')">Área > 2.000 ha</button>
-            <button class="pill-btn" onclick="applyPreset('medium')">500 a 2.000 ha</button>
-            <button class="pill-btn" onclick="applyPreset('small')">Área &lt; 500 ha</button>
-            <button class="pill-btn" onclick="applyPreset('high_vram')">Alta VRAM (> 8 GB)</button>
+            <button class="pill-btn active" onclick="applyPreset('all')">All ({total_props})</button>
+            <button class="pill-btn" onclick="applyPreset('large')">Area > 2,000 ha</button>
+            <button class="pill-btn" onclick="applyPreset('medium')">500 to 2,000 ha</button>
+            <button class="pill-btn" onclick="applyPreset('small')">Area &lt; 500 ha</button>
+            <button class="pill-btn" onclick="applyPreset('high_vram')">High VRAM (> 8 GB)</button>
             <button class="pill-btn" onclick="applyPreset('ms')">Mato Grosso do Sul</button>
         </div>
         <div class="search-box">
             <i data-lucide="search" style="width: 16px; height: 16px; color: var(--text-muted);"></i>
-            <input type="text" id="searchInput" placeholder="Buscar por ID ou Município..." oninput="onSearchInput(event)">
+            <input type="text" id="searchInput" placeholder="Search by ID or Municipality..." oninput="onSearchInput(event)">
         </div>
     </section>
 
     <!-- Tabs Navigation -->
     <nav class="tabs-nav">
-        <button class="tab-btn active" onclick="switchTab('vram')"><i data-lucide="database"></i> Memória de Vídeo (VRAM)</button>
-        <button class="tab-btn" onclick="switchTab('thermal')"><i data-lucide="flame"></i> Térmicas & Compute GPU (Violino)</button>
-        <button class="tab-btn" onclick="switchTab('efficiency')"><i data-lucide="activity"></i> Eficiência & Fases do Pipeline</button>
-        <button class="tab-btn" onclick="switchTab('table')"><i data-lucide="table"></i> Tabela Auditável de Imóveis</button>
+        <button class="tab-btn active" onclick="switchTab('vram')"><i data-lucide="database"></i> Video Memory (VRAM)</button>
+        <button class="tab-btn" onclick="switchTab('thermal')"><i data-lucide="flame"></i> Thermals & GPU Compute (Violin)</button>
+        <button class="tab-btn" onclick="switchTab('efficiency')"><i data-lucide="activity"></i> Efficiency & Pipeline Phases</button>
+        <button class="tab-btn" onclick="switchTab('table')"><i data-lucide="table"></i> Auditable Property Table</button>
     </nav>
 
     <!-- TAB 1: VRAM Analysis -->
     <div id="tab-vram" class="charts-container active">
         <div class="charts-grid">
-            <!-- Chart 1A: VRAM vs Área -->
+            <!-- Chart 1A: VRAM vs Area -->
             <div class="chart-box">
                 <div class="chart-header">
                     <div>
                         <div class="chart-title">
                             <i data-lucide="scatter-chart" style="color: var(--neon-cyan);"></i>
-                            VRAM (Alocada vs. Reservada) vs. Área do Imóvel
+                            VRAM (Allocated vs. Reserved) vs. Property Area
                         </div>
-                        <div class="chart-desc">Relação entre dimensão da fazenda e demanda no Caching Allocator da GPU</div>
+                        <div class="chart-desc">Relationship between farm size and GPU Caching Allocator demand</div>
                     </div>
-                    <button class="pill-btn" id="btnToggleLogScale" onclick="toggleAreaScale()">Escala Log</button>
+                    <button class="pill-btn" id="btnToggleLogScale" onclick="toggleAreaScale()">Log Scale</button>
                 </div>
                 <div id="chart-vram-area" class="chart-plot"></div>
             </div>
 
-            <!-- Chart 1B: Violino VRAM -->
+            <!-- Chart 1B: VRAM Violin -->
             <div class="chart-box">
                 <div class="chart-header">
                     <div>
                         <div class="chart-title">
                             <i data-lucide="bar-chart-2" style="color: var(--neon-purple);"></i>
-                            Gráfico de Violino: Distribuição de VRAM (Alocada vs. Reservada)
+                            Violin Plot: VRAM Distribution (Allocated vs. Reserved)
                         </div>
-                        <div class="chart-desc">Densidade contínua revelando o bolsão de retenção de cache do PyTorch</div>
+                        <div class="chart-desc">Continuous density revealing PyTorch caching allocator retention</div>
                     </div>
                 </div>
                 <div id="chart-vram-violin" class="chart-plot"></div>
@@ -799,9 +820,9 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
                     <div>
                         <div class="chart-title">
                             <i data-lucide="pie-chart" style="color: var(--neon-magenta);"></i>
-                            Sobrecarga de Cache da VRAM (Reservada - Alocada) por Imóvel
+                            VRAM Cache Overhead (Reserved - Allocated) per Property
                         </div>
-                        <div class="chart-desc">Quantidade exata de memória liberada a cada iteração pelo comando `clear_gpu_memory()`</div>
+                        <div class="chart-desc">Exact amount of memory freed at each iteration by `clear_gpu_memory()`</div>
                     </div>
                 </div>
                 <div id="chart-cache-overhead" class="chart-plot"></div>
@@ -812,29 +833,29 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
     <!-- TAB 2: Thermal & GPU Compute -->
     <div id="tab-thermal" class="charts-container">
         <div class="charts-grid">
-            <!-- Chart 2A: Violino Térmico e Compute -->
+            <!-- Chart 2A: Thermal and Compute Violin -->
             <div class="chart-box">
                 <div class="chart-header">
                     <div>
                         <div class="chart-title">
                             <i data-lucide="thermometer-snowflake" style="color: var(--neon-rose);"></i>
-                            Gráfico de Violino: Temperaturas & Carga Computacional
+                            Violin Plot: Operating Temperature & Compute Load
                         </div>
-                        <div class="chart-desc">Distribuição de temperatura máxima e carga (%) dos núcleos CUDA da GPU</div>
+                        <div class="chart-desc">Distribution of maximum temperature and CUDA core load (%)</div>
                     </div>
                 </div>
                 <div id="chart-thermal-violin" class="chart-plot"></div>
             </div>
 
-            <!-- Chart 2B: Correlação Térmica vs Tempo -->
+            <!-- Chart 2B: Thermal Correlation vs Time -->
             <div class="chart-box">
                 <div class="chart-header">
                     <div>
                         <div class="chart-title">
                             <i data-lucide="zap" style="color: var(--neon-amber);"></i>
-                            Temperatura Máxima vs. Duração do Processamento
+                            Maximum Temperature vs. Processing Duration
                         </div>
-                        <div class="chart-desc">Aquecimento operacional da RTX 2080 Ti em função do tempo de estresse contínuo</div>
+                        <div class="chart-desc">RTX 2080 Ti thermal behavior under continuous computational stress</div>
                     </div>
                 </div>
                 <div id="chart-temp-time" class="chart-plot"></div>
@@ -845,29 +866,29 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
     <!-- TAB 3: Efficiency & Phases -->
     <div id="tab-efficiency" class="charts-container">
         <div class="charts-grid">
-            <!-- Chart 3A: Bubble Chart Eficiência -->
+            <!-- Chart 3A: Efficiency Bubble Chart -->
             <div class="chart-box">
                 <div class="chart-header">
                     <div>
                         <div class="chart-title">
                             <i data-lucide="target" style="color: var(--neon-blue);"></i>
-                            Matriz de Eficiência: Tempo vs. Área vs. Parcelas
+                            Efficiency Matrix: Time vs. Area vs. Parcels
                         </div>
-                        <div class="chart-desc">Tamanho da bolha = Quantidade de Parcelas | Cor = Pico de VRAM Alocada</div>
+                        <div class="chart-desc">Bubble size = Parcel Count | Bubble color = Peak Allocated VRAM</div>
                     </div>
                 </div>
                 <div id="chart-bubble-efficiency" class="chart-plot"></div>
             </div>
 
-            <!-- Chart 3B: Parcelas vs Área -->
+            <!-- Chart 3B: Parcels vs Area -->
             <div class="chart-box">
                 <div class="chart-header">
                     <div>
                         <div class="chart-title">
                             <i data-lucide="layers" style="color: var(--neon-emerald);"></i>
-                            Densidade Cadastral: Parcelas vs. Área (ha)
+                            Cadastral Density: Parcels vs. Area (ha)
                         </div>
-                        <div class="chart-desc">Intensidade de divisão de pastagem por dimensão fundiária</div>
+                        <div class="chart-desc">Pasture parcel subdivision density by property size</div>
                     </div>
                 </div>
                 <div id="chart-paddocks-area" class="chart-plot"></div>
@@ -875,15 +896,15 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
         </div>
 
         <div class="charts-grid full">
-            <!-- Chart 3C: Decomposição por Fases -->
+            <!-- Chart 3C: Pipeline Phases Breakdown -->
             <div class="chart-box">
                 <div class="chart-header">
                     <div>
                         <div class="chart-title">
                             <i data-lucide="timer" style="color: var(--neon-cyan);"></i>
-                            Decomposição Temporal por Etapa do Pipeline (Stacked Bar)
+                            Temporal Decomposition per Pipeline Phase (Stacked Bar)
                         </div>
-                        <div class="chart-desc">Comprovação do gargalo computacional: SAMGeo ViT-H consome 80-95% do tempo total</div>
+                        <div class="chart-desc">Confirmation of computational bottleneck: SAMGeo ViT-H accounts for 80-95% of total runtime</div>
                     </div>
                 </div>
                 <div id="chart-phases-breakdown" class="chart-plot tall"></div>
@@ -891,24 +912,24 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
         </div>
     </div>
 
-    <!-- TAB 4: Table -->
+    <!-- TAB 4: Auditable Table -->
     <div id="tab-table" class="charts-container">
         <div class="table-card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h3 style="font-family: var(--font-heading); font-size: 1.15rem; color: #ffffff;">📋 Registros Individuais de Imóveis Auditados</h3>
-                <button class="pill-btn" onclick="exportCSV()"><i data-lucide="download" style="width: 14px; height: 14px; vertical-align: middle;"></i> Exportar para CSV</button>
+                <h3 style="font-family: var(--font-heading); font-size: 1.15rem; color: #ffffff;">Individual Audited Property Records</h3>
+                <button class="pill-btn" onclick="exportCSV()"><i data-lucide="download" style="width: 14px; height: 14px; vertical-align: middle;"></i> Export to CSV</button>
             </div>
             <table>
                 <thead>
                     <tr>
-                        <th onclick="sortTable('id')">Código do Imóvel</th>
-                        <th onclick="sortTable('municipio')">Município</th>
-                        <th onclick="sortTable('car_area_ha')">Área CAR (ha)</th>
-                        <th onclick="sortTable('paddocks_count')">Parcelas</th>
-                        <th onclick="sortTable('total_min')">Duração</th>
-                        <th onclick="sortTable('vram_alloc_peak_gb')">VRAM Aloc.</th>
-                        <th onclick="sortTable('vram_res_peak_gb')">VRAM Res. (Cache)</th>
-                        <th onclick="sortTable('gpu_temp_max')">Temp. GPU</th>
+                        <th onclick="sortTable('id')">Property Code</th>
+                        <th onclick="sortTable('municipio')">Municipality</th>
+                        <th onclick="sortTable('car_area_ha')">CAR Area (ha)</th>
+                        <th onclick="sortTable('paddocks_count')">Parcels</th>
+                        <th onclick="sortTable('total_min')">Duration</th>
+                        <th onclick="sortTable('vram_alloc_peak_gb')">Alloc. VRAM</th>
+                        <th onclick="sortTable('vram_res_peak_gb')">Res. VRAM (Cache)</th>
+                        <th onclick="sortTable('gpu_temp_max')">GPU Temp</th>
                         <th onclick="sortTable('gpu_util_avg')">Compute Load</th>
                     </tr>
                 </thead>
@@ -918,23 +939,22 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
     </div>
 
     <footer class="footer">
-        <p>LAPIG / UFG - Laboratório de Processamento de Imagens e Geoprocessamento • Pipeline Cadastral Watertight com Zero Sobreposição</p>
+        <p>LAPIG / UFG - Image Processing and Geoprocessing Laboratory • Watertight Cadastral Pipeline with Zero Overlap</p>
     </footer>
 
-    <!-- Dados Embutidos -->
+    <!-- Embedded Benchmark Data -->
     <script id="benchmark-data" type="application/json">
 {records_json}
     </script>
 
-    <!-- Lógica Interativa Javascript -->
+    <!-- Interactive Javascript Logic -->
     <script>
-        // Carrega dados embutidos
         const rawData = JSON.parse(document.getElementById('benchmark-data').textContent);
         let activeData = [...rawData];
         let isAreaLog = false;
         let currentSort = {{ col: 'car_area_ha', asc: false }};
 
-        // Cores temáticas
+        // Theme palette
         const theme = {{
             cyan: '#00f2fe',
             purple: '#a855f7',
@@ -968,7 +988,6 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
 
         let currentTab = 'vram';
         let searchTimer = null;
-        let resizeTimer = null;
 
         function initDashboard() {{
             renderActiveTabCharts();
@@ -980,12 +999,11 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             currentTab = tabId;
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.charts-container').forEach(c => c.classList.remove('active'));
-            
+
             event.currentTarget.classList.add('active');
             const target = document.getElementById('tab-' + tabId);
             if (target) {{
                 target.classList.add('active');
-                // Renderiza sob demanda apenas os gráficos da aba visível, evitando acúmulo de WebGL
                 setTimeout(() => {{
                     renderActiveTabCharts();
                 }}, 40);
@@ -1015,7 +1033,6 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             renderTable();
         }}
 
-        // Debounce para evitar renderizações a cada tecla digitada
         function onSearchInput(e) {{
             clearTimeout(searchTimer);
             searchTimer = setTimeout(() => {{
@@ -1028,8 +1045,8 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             if (!q) {{
                 activeData = [...rawData];
             }} else {{
-                activeData = rawData.filter(d => 
-                    d.id.toLowerCase().includes(q) || 
+                activeData = rawData.filter(d =>
+                    d.id.toLowerCase().includes(q) ||
                     d.municipio.toLowerCase().includes(q)
                 );
             }}
@@ -1040,26 +1057,26 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
         function toggleAreaScale() {{
             isAreaLog = !isAreaLog;
             const btn = document.getElementById('btnToggleLogScale');
-            btn.textContent = isAreaLog ? 'Escala Linear' : 'Escala Log';
+            btn.textContent = isAreaLog ? 'Linear Scale' : 'Log Scale';
             btn.classList.toggle('active', isAreaLog);
             renderChartVramArea();
         }}
 
-        /* ---------------- GRÁFICOS PLOTLY (Zero-Leak com Plotly.react) ---------------- */
+        /* ---------------- PLOTLY CHARTS (Zero-Leak with Plotly.react) ---------------- */
 
         function renderChartVramArea() {{
             const traceAlloc = {{
                 x: activeData.map(d => d.car_area_ha),
                 y: activeData.map(d => d.vram_alloc_peak_gb),
                 mode: 'markers',
-                name: 'VRAM Alocada Real (GB)',
+                name: 'Allocated VRAM (GB)',
                 marker: {{
                     color: theme.cyan,
                     size: 10,
                     opacity: 0.85,
                     line: {{ color: '#ffffff', width: 1 }}
                 }},
-                text: activeData.map(d => `<b>${{d.municipio}}</b><br>ID: ${{d.id}}<br>Área: ${{d.car_area_ha.toLocaleString('pt-BR')}} ha<br>VRAM Alocada: ${{d.vram_alloc_peak_gb}} GB`),
+                text: activeData.map(d => `<b>${{d.municipio}}</b><br>ID: ${{d.id}}<br>Area: ${{d.car_area_ha.toLocaleString('en-US')}} ha<br>Allocated VRAM: ${{d.vram_alloc_peak_gb}} GB`),
                 hoverinfo: 'text'
             }};
 
@@ -1067,7 +1084,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
                 x: activeData.map(d => d.car_area_ha),
                 y: activeData.map(d => d.vram_res_peak_gb),
                 mode: 'markers',
-                name: 'VRAM Reservada (Cache) (GB)',
+                name: 'Reserved VRAM (Cache) (GB)',
                 marker: {{
                     color: theme.purple,
                     size: 10,
@@ -1075,14 +1092,14 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
                     opacity: 0.85,
                     line: {{ color: '#ffffff', width: 1 }}
                 }},
-                text: activeData.map(d => `<b>${{d.municipio}}</b><br>ID: ${{d.id}}<br>Área: ${{d.car_area_ha.toLocaleString('pt-BR')}} ha<br>VRAM Reservada: ${{d.vram_res_peak_gb}} GB`),
+                text: activeData.map(d => `<b>${{d.municipio}}</b><br>ID: ${{d.id}}<br>Area: ${{d.car_area_ha.toLocaleString('en-US')}} ha<br>Reserved VRAM: ${{d.vram_res_peak_gb}} GB`),
                 hoverinfo: 'text'
             }};
 
             const layout = JSON.parse(JSON.stringify(layoutBase));
-            layout.xaxis.title = isAreaLog ? 'Área do Imóvel no CAR (ha) - [Escala Logarítmica]' : 'Área do Imóvel no CAR (ha) - [Escala Linear]';
+            layout.xaxis.title = isAreaLog ? 'CAR Property Area (ha) - [Logarithmic Scale]' : 'CAR Property Area (ha) - [Linear Scale]';
             layout.xaxis.type = isAreaLog ? 'log' : 'linear';
-            layout.yaxis.title = 'Pico de VRAM da GPU (GB)';
+            layout.yaxis.title = 'GPU Peak VRAM (GB)';
             layout.legend = {{ orientation: 'h', y: 1.15, x: 0.05 }};
 
             Plotly.react('chart-vram-area', [traceAlloc, traceRes], layout, {{ responsive: true, displayModeBar: false }});
@@ -1092,7 +1109,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             const traceAlloc = {{
                 type: 'violin',
                 y: activeData.map(d => d.vram_alloc_peak_gb),
-                name: 'VRAM Alocada Real',
+                name: 'Allocated VRAM',
                 box: {{ visible: true }},
                 meanline: {{ visible: true }},
                 line: {{ color: theme.cyan }},
@@ -1106,7 +1123,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             const traceRes = {{
                 type: 'violin',
                 y: activeData.map(d => d.vram_res_peak_gb),
-                name: 'VRAM Reservada (Cache)',
+                name: 'Reserved VRAM (Cache)',
                 box: {{ visible: true }},
                 meanline: {{ visible: true }},
                 line: {{ color: theme.purple }},
@@ -1118,7 +1135,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             }};
 
             const layout = JSON.parse(JSON.stringify(layoutBase));
-            layout.yaxis.title = 'VRAM Registrada (GB)';
+            layout.yaxis.title = 'Recorded VRAM (GB)';
             layout.legend = {{ orientation: 'h', y: 1.12, x: 0.1 }};
 
             Plotly.react('chart-vram-violin', [traceAlloc, traceRes], layout, {{ responsive: true, displayModeBar: false }});
@@ -1126,7 +1143,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
 
         function renderChartCacheOverhead() {{
             const sortedByDiff = [...activeData].sort((a, b) => (b.vram_res_peak_gb - b.vram_alloc_peak_gb) - (a.vram_res_peak_gb - a.vram_alloc_peak_gb));
-            
+
             const trace = {{
                 x: sortedByDiff.map(d => `${{d.municipio}} (${{d.id.substring(0, 10)}}...)`),
                 y: sortedByDiff.map(d => +(d.vram_res_peak_gb - d.vram_alloc_peak_gb).toFixed(2)),
@@ -1145,7 +1162,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             }};
 
             const layout = JSON.parse(JSON.stringify(layoutBase));
-            layout.yaxis.title = 'Memória Ociosa em Cache (Reservada - Alocada) [GB]';
+            layout.yaxis.title = 'Idle Cache Memory (Reserved - Allocated) [GB]';
             layout.xaxis.tickangle = -35;
             layout.margin.b = 100;
 
@@ -1156,7 +1173,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             const traceTemp = {{
                 type: 'violin',
                 y: activeData.map(d => d.gpu_temp_max),
-                name: 'Temperatura GPU (°C)',
+                name: 'GPU Temperature (°C)',
                 box: {{ visible: true }},
                 meanline: {{ visible: true }},
                 line: {{ color: theme.rose }},
@@ -1169,7 +1186,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             const traceCompute = {{
                 type: 'violin',
                 y: activeData.map(d => d.gpu_util_avg),
-                name: 'Carga Média GPU (%)',
+                name: 'Mean GPU Compute Load (%)',
                 box: {{ visible: true }},
                 meanline: {{ visible: true }},
                 line: {{ color: theme.amber }},
@@ -1180,7 +1197,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             }};
 
             const layout = JSON.parse(JSON.stringify(layoutBase));
-            layout.yaxis.title = 'Valor Medido (°C ou %)';
+            layout.yaxis.title = 'Measured Value (°C or %)';
             layout.legend = {{ orientation: 'h', y: 1.12, x: 0.1 }};
 
             Plotly.react('chart-thermal-violin', [traceTemp, traceCompute], layout, {{ responsive: true, displayModeBar: false }});
@@ -1202,13 +1219,13 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
                     colorbar: {{ title: 'Temp (°C)', len: 0.8 }},
                     line: {{ color: '#ffffff', width: 1 }}
                 }},
-                text: activeData.map(d => `<b>${{d.municipio}}</b><br>ID: ${{d.id}}<br>Duração: ${{d.total_min}} min (${{d.total_sec}}s)<br>Temp Máx: ${{d.gpu_temp_max}} °C<br>Área: ${{d.car_area_ha}} ha`),
+                text: activeData.map(d => `<b>${{d.municipio}}</b><br>ID: ${{d.id}}<br>Duration: ${{d.total_min}} min (${{d.total_sec}}s)<br>Peak Temp: ${{d.gpu_temp_max}} °C<br>Area: ${{d.car_area_ha}} ha`),
                 hoverinfo: 'text'
             }};
 
             const layout = JSON.parse(JSON.stringify(layoutBase));
-            layout.xaxis.title = 'Duração Total de Processamento (minutos)';
-            layout.yaxis.title = 'Temperatura Máxima Registrada da GPU (°C)';
+            layout.xaxis.title = 'Total Processing Duration (minutes)';
+            layout.yaxis.title = 'Peak GPU Temperature (°C)';
 
             Plotly.react('chart-temp-time', [trace], layout, {{ responsive: true, displayModeBar: false }});
         }}
@@ -1222,17 +1239,17 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
                     size: activeData.map(d => Math.max(10, Math.min(45, d.paddocks_count * 0.25))),
                     color: activeData.map(d => d.vram_alloc_peak_gb),
                     colorscale: 'Viridis',
-                    colorbar: {{ title: 'VRAM Aloc. (GB)' }},
+                    colorbar: {{ title: 'Alloc. VRAM (GB)' }},
                     opacity: 0.85,
                     line: {{ color: '#ffffff', width: 1 }}
                 }},
-                text: activeData.map(d => `<b>${{d.municipio}}</b><br>Área: ${{d.car_area_ha.toLocaleString('pt-BR')}} ha<br>Parcelas: ${{d.paddocks_count}}<br>Tempo: ${{d.total_min}} min (${{d.total_sec}}s)<br>Pico VRAM: ${{d.vram_alloc_peak_gb}} GB`),
+                text: activeData.map(d => `<b>${{d.municipio}}</b><br>Area: ${{d.car_area_ha.toLocaleString('en-US')}} ha<br>Parcels: ${{d.paddocks_count}}<br>Duration: ${{d.total_min}} min (${{d.total_sec}}s)<br>Peak VRAM: ${{d.vram_alloc_peak_gb}} GB`),
                 hoverinfo: 'text'
             }};
 
             const layout = JSON.parse(JSON.stringify(layoutBase));
-            layout.xaxis.title = 'Área do Imóvel CAR (ha)';
-            layout.yaxis.title = 'Tempo Total (minutos)';
+            layout.xaxis.title = 'CAR Property Area (ha)';
+            layout.yaxis.title = 'Total Duration (minutes)';
 
             Plotly.react('chart-bubble-efficiency', [trace], layout, {{ responsive: true, displayModeBar: false }});
         }}
@@ -1248,23 +1265,23 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
                     opacity: 0.85,
                     line: {{ color: '#ffffff', width: 1 }}
                 }},
-                text: activeData.map(d => `<b>${{d.municipio}}</b><br>Área: ${{d.car_area_ha.toLocaleString('pt-BR')}} ha<br>Parcelas: ${{d.paddocks_count}}`),
+                text: activeData.map(d => `<b>${{d.municipio}}</b><br>Area: ${{d.car_area_ha.toLocaleString('en-US')}} ha<br>Parcels: ${{d.paddocks_count}}`),
                 hoverinfo: 'text'
             }};
 
             const layout = JSON.parse(JSON.stringify(layoutBase));
-            layout.xaxis.title = 'Área do Imóvel CAR (ha)';
-            layout.yaxis.title = 'Total de Parcelas Delimitadas';
+            layout.xaxis.title = 'CAR Property Area (ha)';
+            layout.yaxis.title = 'Total Mapped Parcels';
 
             Plotly.react('chart-paddocks-area', [trace], layout, {{ responsive: true, displayModeBar: false }});
         }}
 
         function renderChartPhasesBreakdown() {{
             const categories = [
-                {{ key: 'sam_duration_sec', name: 'Inferência SAMGeo (ViT-H GPU)', color: theme.cyan }},
-                {{ key: 'vectorize_duration_sec', name: 'Vetorização Planar (CPU)', color: theme.emerald }},
-                {{ key: 's2_download_sec', name: 'Download Sentinel-2 (GEE)', color: theme.blue }},
-                {{ key: 'mapbiomas_sec', name: 'Classificação MapBiomas (GEE)', color: theme.purple }}
+                {{ key: 'sam_duration_sec', name: 'SAMGeo ViT-H Inference (GPU)', color: theme.cyan }},
+                {{ key: 'vectorize_duration_sec', name: 'Planar Vectorization (CPU)', color: theme.emerald }},
+                {{ key: 's2_download_sec', name: 'Sentinel-2 Download (GEE)', color: theme.blue }},
+                {{ key: 'mapbiomas_sec', name: 'MapBiomas Classification (GEE)', color: theme.purple }}
             ];
 
             const sortedProps = [...activeData].sort((a, b) => b.total_sec - a.total_sec);
@@ -1278,7 +1295,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
 
             const layout = JSON.parse(JSON.stringify(layoutBase));
             layout.barmode = 'stack';
-            layout.yaxis.title = 'Duração Acumulada da Etapa (segundos)';
+            layout.yaxis.title = 'Phase Duration (seconds)';
             layout.xaxis.tickangle = -35;
             layout.legend = {{ orientation: 'h', y: 1.15, x: 0.05 }};
             layout.margin.b = 100;
@@ -1286,7 +1303,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             Plotly.react('chart-phases-breakdown', traces, layout, {{ responsive: true, displayModeBar: false }});
         }}
 
-        // Renderiza apenas os gráficos da aba ativa (Lazy-Rendering)
+        // Render only charts in active tab (Lazy-Rendering)
         function renderActiveTabCharts() {{
             if (currentTab === 'vram') {{
                 renderChartVramArea();
@@ -1302,7 +1319,7 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             }}
         }}
 
-        /* ---------------- TABELA AUDITÁVEL ---------------- */
+        /* ---------------- AUDITABLE TABLE ---------------- */
 
         function renderTable() {{
             const tbody = document.getElementById('tableBody');
@@ -1319,15 +1336,15 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
 
             sorted.forEach(d => {{
                 const tr = document.createElement('tr');
-                
-                // Tags coloridas
+
+                // Color tags
                 const tempTag = d.gpu_temp_max > 65 ? 'danger' : (d.gpu_temp_max > 55 ? 'warning' : 'normal');
                 const vramTag = d.vram_res_peak_gb > 15 ? 'danger' : (d.vram_res_peak_gb > 10 ? 'purple' : 'normal');
-                
+
                 tr.innerHTML = `
                     <td><a href="#" class="id-link" title="${{d.id}}">${{d.id}}</a></td>
                     <td><strong>${{d.municipio}}</strong></td>
-                    <td style="font-family: var(--font-mono);">${{d.car_area_ha.toLocaleString('pt-BR')}} ha</td>
+                    <td style="font-family: var(--font-mono);">${{d.car_area_ha.toLocaleString('en-US')}} ha</td>
                     <td style="font-family: var(--font-mono); font-weight: 600;">${{d.paddocks_count}}</td>
                     <td style="font-family: var(--font-mono);">${{d.total_min}} min <span style="color: var(--text-muted); font-size: 0.75rem;">(${{d.total_sec}}s)</span></td>
                     <td style="font-family: var(--font-mono);">${{d.vram_alloc_peak_gb.toFixed(2)}} GB</td>
@@ -1358,11 +1375,11 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
             const blob = new Blob([csv], {{ type: 'text/csv;charset=utf-8;' }});
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = 'relatorio_benchmark_lapig.csv';
+            link.download = 'lapig_benchmark_report.csv';
             link.click();
         }}
 
-        // Inicializa ao carregar a página
+        // Initialize on page load
         window.addEventListener('DOMContentLoaded', initDashboard);
     </script>
 </body>
@@ -1373,12 +1390,12 @@ def generate_dashboard_html(records, output_html_path="results/dashboard_benchma
     with open(output_html_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
 
-    print(f"✨ Dashboard gerado com sucesso em: {output_html_path}")
+    print(f"Dashboard successfully generated at: {output_html_path}")
     return output_html_path
 
 if __name__ == '__main__':
     recs = collect_benchmark_dataset()
-    print(f"Compilados {len(recs)} registros.")
+    print(f"Compiled {len(recs)} property records.")
     out_p = generate_dashboard_html(recs, output_html_path="results/dashboard_benchmark.html")
-    # Copia também para o diretório raiz para fácil acesso
+    # Also copy to root directory for easy access
     generate_dashboard_html(recs, output_html_path="dashboard_benchmark.html")

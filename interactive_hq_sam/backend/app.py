@@ -1,6 +1,6 @@
 """
-Servidor FastAPI para Aplicação de Segmentação Interativa por Amostragem HQ-SAM
-LAPIG - Laboratório de Processamento de Imagens e Geoprocessamento (UFG)
+FastAPI Server for HQ-SAM Prompt-Based Interactive Parcel Segmentation
+LAPIG - Image Processing and Geoprocessing Laboratory (UFG)
 """
 
 import os
@@ -19,7 +19,7 @@ from typing import List, Optional
 
 from .hq_sam_engine import HQSamEngine
 
-app = FastAPI(title="LAPIG HQ-SAM Interactive Paddock Segmenter", version="1.0.0")
+app = FastAPI(title="LAPIG HQ-SAM Interactive Parcel Segmenter", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,10 +29,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Inicializa o motor HQ-SAM Singleton
+# Initialize HQ-SAM Engine Singleton
 engine = HQSamEngine(model_type="vit_h")
 
-# Schemas Pydantic
+# Pydantic Schemas
 class CoordsRequest(BaseModel):
     lat: float
     lon: float
@@ -48,7 +48,7 @@ class CarIdRequest(BaseModel):
 class PointPrompt(BaseModel):
     lon: float
     lat: float
-    label: int = 1  # 1 = positivo, 0 = negativo
+    label: int = 1  # 1 = positive (foreground), 0 = negative (background)
 
 class PredictRequest(BaseModel):
     points: List[PointPrompt]
@@ -118,8 +118,8 @@ async def upload_roi(file: UploadFile = File(...)):
     try:
         ext = os.path.splitext(file.filename)[1].lower()
         if ext not in [".kml", ".kmz", ".gpkg", ".geojson", ".json", ".zip", ".shp"]:
-            raise HTTPException(status_code=400, detail="Formato não suportado. Use .kml, .kmz, .gpkg, .geojson ou .zip com Shapefile.")
-        
+            raise HTTPException(status_code=400, detail="Unsupported format. Use .kml, .kmz, .gpkg, .geojson or .zip with Shapefile.")
+
         with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
             content = await file.read()
             tmp.write(content)
@@ -132,18 +132,18 @@ async def upload_roi(file: UploadFile = File(...)):
         target_path = tmp_path
         extracted_temp_dir = None
 
-        # 1. Tratamento específico para KMZ (arquivo compactado com KML interno)
+        # 1. KMZ handling (compressed archive containing internal KML)
         if ext == ".kmz":
             with zipfile.ZipFile(tmp_path, 'r') as z:
                 kml_names = [f for f in z.namelist() if f.lower().endswith('.kml')]
                 if not kml_names:
-                    raise ValueError("Nenhum arquivo .kml encontrado dentro do pacote KMZ enviado.")
+                    raise ValueError("No .kml file found inside the uploaded KMZ archive.")
                 target_kml = "doc.kml" if "doc.kml" in kml_names else kml_names[0]
                 extracted_temp_dir = tempfile.mkdtemp()
                 target_path = z.extract(target_kml, extracted_temp_dir)
                 ext = ".kml"
 
-        # 2. Leitura do arquivo com GeoPandas
+        # 2. Vector file reading via GeoPandas
         if ext == ".kml":
             try:
                 import pyogrio
@@ -168,18 +168,18 @@ async def upload_roi(file: UploadFile = File(...)):
             gdf = gpd.read_file(target_path)
 
         if gdf.empty:
-            raise ValueError("O arquivo vetorial enviado não possui feições ou geometrias válidas.")
+            raise ValueError("The uploaded vector file contains no valid features or geometries.")
 
-        # Garante projeção WGS84 (padrão de KML/KMZ e GeoJSON)
+        # Ensure WGS84 CRS (standard for KML/KMZ and GeoJSON)
         if gdf.crs is None:
             gdf = gdf.set_crs("EPSG:4326")
         gdf_4326 = gdf.to_crs("EPSG:4326")
         gdf_4326 = gdf_4326[gdf_4326.geometry.notnull() & ~gdf_4326.geometry.is_empty]
 
         if gdf_4326.empty:
-            raise ValueError("Nenhuma geometria válida encontrada no arquivo.")
+            raise ValueError("No valid geometry found in the uploaded file.")
 
-        # Unifica geometrias (suporta múltiplos placemarks/talhões dentro do KML/KMZ)
+        # Unify geometries (handles multiple placemarks/polygons inside vector file)
         union_geom = unary_union(list(gdf_4326.geometry))
         if union_geom.geom_type in ['LineString', 'MultiLineString']:
             union_geom = union_geom.convex_hull
@@ -190,7 +190,7 @@ async def upload_roi(file: UploadFile = File(...)):
             else:
                 union_geom = union_geom.convex_hull
 
-        # Força geometria 2D (remove dimensão Z caso venha de KML/KMZ para total compatibilidade com GEE/GeoJSON)
+        # Force 2D geometry (strips Z dimension for complete GEE / GeoJSON compatibility)
         import shapely.ops
         union_geom = shapely.ops.transform(lambda x, y, *args: (x, y), union_geom)
 
@@ -217,7 +217,7 @@ async def upload_roi(file: UploadFile = File(...)):
             "geometry": shapely.geometry.mapping(union_geom)
         }
 
-        engine.set_progress(5, "Processando arquivo vetorial...", f"Arquivo: {file.filename} (calculando extensão territorial)...")
+        engine.set_progress(5, "Processing vector file...", f"File: {file.filename} (calculating territorial bounds)...")
         cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cache")
         os.makedirs(cache_dir, exist_ok=True)
         tif_path = os.path.join(cache_dir, f"s2_{engine.active_roi_id}.tif")
@@ -235,15 +235,15 @@ async def upload_roi(file: UploadFile = File(...)):
             engine.image_crs = str(src.crs)
             engine.image_bounds_wgs84 = list(transform_bounds(src.crs, "EPSG:4326", *src.bounds))
 
-        engine.set_progress(88, "Gerando camada espectral...", "Normalizando contraste RGB para visualização no mapa...")
+        engine.set_progress(88, "Generating spectral overlay...", "Normalizing RGB contrast for map rendering...")
         engine.overlay_png_path = os.path.join(cache_dir, f"overlay_{engine.active_roi_id}.png")
         engine._generate_overlay_png(tif_path, engine.overlay_png_path)
 
         if engine.sam is not None:
-            engine.set_progress(92, "Calculando embeddings na GPU...", "Processando tensores no ViT-H (RTX 2080 Ti)...")
+            engine.set_progress(92, "Computing embeddings on GPU...", "Processing image tensors on ViT-H (RTX 2080 Ti)...")
             engine.sam.set_image(tif_path)
 
-        engine.set_progress(100, "Concluído!", "Vetor e Sentinel-2 carregados com sucesso!", status="done")
+        engine.set_progress(100, "Completed!", "Vector boundary and Sentinel-2 imagery successfully loaded!", status="done")
 
         return {
             "roi_id": engine.active_roi_id,
@@ -268,7 +268,7 @@ async def upload_roi(file: UploadFile = File(...)):
 @app.get("/api/overlay")
 def get_overlay_image():
     if not engine.overlay_png_path or not os.path.exists(engine.overlay_png_path):
-        raise HTTPException(status_code=404, detail="Nenhum overlay disponível")
+        raise HTTPException(status_code=404, detail="No overlay image available")
     return FileResponse(engine.overlay_png_path, media_type="image/png")
 
 @app.post("/api/predict")
@@ -335,7 +335,7 @@ def export_geojson(regularize: bool = True):
         try:
             engine.regularize_paddocks_topology()
         except Exception as e:
-            print(f"Aviso na regularização automática antes de exportar: {e}")
+            print(f"Notice during automatic regularization prior to export: {e}")
 
     features = []
     for p in engine.saved_paddocks:
@@ -357,10 +357,10 @@ def export_geojson(regularize: bool = True):
     return StreamingResponse(
         io.BytesIO(content.encode("utf-8")),
         media_type="application/geo+json",
-        headers={"Content-Disposition": f"attachment; filename=parcelas_hq_sam_{engine.active_roi_id or 'export'}.geojson"}
+        headers={"Content-Disposition": f"attachment; filename=parcels_hq_sam_{engine.active_roi_id or 'export'}.geojson"}
     )
 
-# Monta arquivos estáticos do Frontend
+# Mount static frontend files
 frontend_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend")
 if os.path.exists(frontend_dir):
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")

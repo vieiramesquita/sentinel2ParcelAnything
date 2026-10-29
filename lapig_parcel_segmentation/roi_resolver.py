@@ -1,17 +1,17 @@
 """
-Módulo 0: Resolvedor Universal de Área de Interesse (ROI)
-LAPIG - Laboratório de Processamento de Imagens e Geoprocessamento (UFG)
+Module 0: Universal Region of Interest (ROI) Resolver
+LAPIG - Image Processing and Geoprocessing Laboratory (UFG)
 
-Permite ao usuário fornecer a área de interesse através de qualquer uma das modalidades:
-  1. Arquivo vetorial local (.shp, .gpkg, .fgb, .parquet, .geojson):
-     - Suporte a coluna de ID do imóvel (ex: id_column='cod_imovel')
-     - Suporte a filtro por valor de ID (ex: id_value='CAR-GO-001')
-  2. Asset ou Objeto do Google Earth Engine:
-     - 'projects/...' ou ee.FeatureCollection / ee.Feature / ee.Geometry
-     - Filtro opcional car_property_filter=('cod_imovel', '...')
-  3. Coordenada Geográfica:
-     - (lat, lon) -> Busca espacial automática do imóvel na base do CAR do GEE.
-     - Extrai o código oficial do CAR automaticamente.
+Allows users to define the area of interest through any of the supported modalities:
+  1. Local vector file (.shp, .gpkg, .fgb, .parquet, .geojson):
+     - Support for property ID column (e.g., id_column='cod_imovel')
+     - Support for specific ID filtering (e.g., id_value='CAR-GO-001')
+  2. Google Earth Engine Asset or Object:
+     - 'projects/...' or ee.FeatureCollection / ee.Feature / ee.Geometry
+     - Optional filter car_property_filter=('cod_imovel', '...')
+  3. Geographic Coordinates:
+     - (lat, lon) -> Automatic spatial intersection with CAR assets in GEE.
+     - Automatically extracts the official CAR property code.
 """
 
 import os
@@ -29,16 +29,16 @@ DEFAULT_CAR_ASSETS = [
 ]
 
 def sanitize_id(id_val):
-    """Gera uma string segura para nomes de pastas e arquivos."""
+    """Generates a filesystem-safe string for directory and file names."""
     if id_val is None:
-        return "imovel"
+        return "property"
     cleaned = re.sub(r'[\\/*?:"<>|]', '_', str(id_val)).strip()
     return cleaned[:120]
 
 def parse_lat_lon(coord):
     """
-    Identifica de forma inteligente latitude e longitude para o território brasileiro.
-    Aceita tupla, lista, dict ou string 'lat, lon'.
+    Intelligently identifies latitude and longitude within Brazilian territory.
+    Accepts tuple, list, dict, or 'lat, lon' string.
     """
     if isinstance(coord, str):
         parts = [float(p.strip()) for p in coord.replace(';', ',').split(',') if p.strip()]
@@ -50,9 +50,9 @@ def parse_lat_lon(coord):
     elif isinstance(coord, (list, tuple)):
         v1, v2 = float(coord[0]), float(coord[1])
     else:
-        raise ValueError(f"Formato de coordenada inválido: {coord}")
+        raise ValueError(f"Invalid coordinate format: {coord}")
 
-    # No Brasil: Longitude está entre -74 e -34. Latitude está entre -35 e +6.
+    # Brazil geographic boundaries: Longitude is between -75 and -34. Latitude is between -35 and +6.
     if -75 <= v1 <= -34 and -35 <= v2 <= 6:
         lon, lat = v1, v2
     elif -75 <= v2 <= -34 and -35 <= v1 <= 6:
@@ -63,7 +63,7 @@ def parse_lat_lon(coord):
     return lat, lon
 
 def gdf_to_ee_feature_collection(gdf):
-    """Converte um GeoDataFrame local para ee.FeatureCollection."""
+    """Converts a local GeoDataFrame to ee.FeatureCollection."""
     gdf_4326 = gdf.to_crs(epsg=4326)
     features = []
     for idx, row in gdf_4326.iterrows():
@@ -81,22 +81,22 @@ def gdf_to_ee_feature_collection(gdf):
 
 def resolve_input_roi(
     input_target,
-    id_column=None,            # Coluna que identifica o imóvel no arquivo (ex: 'cod_imovel', 'id')
-    id_value=None,             # Valor opcional de ID caso o arquivo tenha múltiplos imóveis
-    car_property_filter=None,  # Tupla (campo, valor) para asset do EE
+    id_column=None,            # Column identifying rural property in the vector file (e.g., 'cod_imovel', 'id')
+    id_value=None,             # Optional specific ID filter
+    car_property_filter=None,  # Tuple (field, value) for GEE asset
     car_assets=None,
     buffer_radius_meters=1500,
     ee_project=None
 ):
     """
-    Resolve de forma universal o input da Área de Interesse (ROI).
-    
-    Retorna:
-      roi_ee: ee.FeatureCollection pronta para GEE (mosaico S2 e MapBiomas)
-      gdf_car: gpd.GeoDataFrame em EPSG:4326 para recorte vetorial local
-      info: Dicionário contendo 'id_imovel', 'cod_imovel', 'area_ha', etc.
+    Universally resolves input target into an Area of Interest (ROI).
+
+    Returns:
+      roi_ee: ee.FeatureCollection ready for GEE (S2 mosaic and MapBiomas)
+      gdf_car: gpd.GeoDataFrame in EPSG:4326 for local vector clipping
+      info: Dictionary containing 'id_imovel', 'cod_imovel', 'area_ha', etc.
     """
-    # Não re-inicializa se o Earth Engine já estiver ativo na sessão
+    # Do not reinitialize if Earth Engine is already active in session
     is_init = False
     try:
         is_init = ee.data._credentials is not None
@@ -125,24 +125,23 @@ def resolve_input_roi(
         car_assets = DEFAULT_CAR_ASSETS
 
     # -------------------------------------------------------------
-    # CASO 1: Objeto Earth Engine já instanciado
+    # CASE 1: Earth Engine Object already instantiated
     # -------------------------------------------------------------
     if isinstance(input_target, ee.FeatureCollection):
-        print("📥 Entrada identificada: ee.FeatureCollection")
+        print("Input identified: ee.FeatureCollection")
         roi_ee = input_target
         import geemap
         gdf_car = geemap.ee_to_gdf(roi_ee).to_crs(epsg=4326)
-        
-        # Tentar extrair cod_imovel se existir nas colunas
+
         prop_id = None
         for col in ['cod_imovel', 'codigo', 'id', 'system:index']:
             if col in gdf_car.columns and len(gdf_car) > 0:
                 prop_id = str(gdf_car[col].iloc[0])
                 break
         prop_id = prop_id or "ee_collection"
-        
+
         info = {
-            "tipo": "ee_feature_collection",
+            "type": "ee_feature_collection",
             "features": len(gdf_car),
             "id_imovel": prop_id,
             "cod_imovel": prop_id
@@ -150,85 +149,85 @@ def resolve_input_roi(
         return roi_ee, gdf_car, info
 
     if isinstance(input_target, ee.Feature):
-        print("📥 Entrada identificada: ee.Feature")
+        print("Input identified: ee.Feature")
         roi_ee = ee.FeatureCollection([input_target])
         import geemap
         gdf_car = geemap.ee_to_gdf(roi_ee).to_crs(epsg=4326)
         prop_id = str(gdf_car.get('cod_imovel', ['ee_feature'])[0])
-        info = {"tipo": "ee_feature", "features": 1, "id_imovel": prop_id, "cod_imovel": prop_id}
+        info = {"type": "ee_feature", "features": 1, "id_imovel": prop_id, "cod_imovel": prop_id}
         return roi_ee, gdf_car, info
 
     if isinstance(input_target, ee.Geometry):
-        print("📥 Entrada identificada: ee.Geometry")
+        print("Input identified: ee.Geometry")
         roi_ee = ee.FeatureCollection([ee.Feature(input_target, {})])
         import geemap
         gdf_car = geemap.ee_to_gdf(roi_ee).to_crs(epsg=4326)
-        info = {"tipo": "ee_geometry", "features": 1, "id_imovel": "ee_geometry", "cod_imovel": "ee_geometry"}
+        info = {"type": "ee_geometry", "features": 1, "id_imovel": "ee_geometry", "cod_imovel": "ee_geometry"}
         return roi_ee, gdf_car, info
 
     # -------------------------------------------------------------
-    # CASO 2: Arquivo Vetorial Local ou String de Caminho
+    # CASE 2: Local Vector File or Path String
     # -------------------------------------------------------------
     if isinstance(input_target, str):
         target_str = input_target.strip()
 
-        # Verifica se é um arquivo local existente
+        # Check if local file exists
         if os.path.exists(target_str):
             ext = os.path.splitext(target_str)[1].lower()
-            print(f"📥 Entrada identificada: Arquivo Vetorial Local ({ext}) -> {os.path.basename(target_str)}")
-            
+            print(f"Input identified: Local Vector File ({ext}) -> {os.path.basename(target_str)}")
+
             if ext in ['.parquet', '.geoparquet']:
                 gdf = gpd.read_parquet(target_str)
             else:
                 gdf = gpd.read_file(target_str)
 
             if gdf.crs is None:
-                print("⚠️ Vetor sem CRS definido. Assumindo EPSG:4326 (WGS84).")
+                print("Warning: Vector file has no defined CRS. Assuming EPSG:4326 (WGS84).")
                 gdf = gdf.set_crs(epsg=4326)
             else:
                 gdf = gdf.to_crs(epsg=4326)
 
-            # Validação e seleção da coluna de ID
+            # Property ID validation and filtering
             prop_id = None
             if id_column is not None:
                 if id_column not in gdf.columns:
                     cols_str = ", ".join([f"'{c}'" for c in gdf.columns if c != 'geometry'])
                     raise ValueError(
-                        f"❌ Coluna de ID '{id_column}' não encontrada no arquivo.\n"
-                        f"   Colunas disponíveis no arquivo: [{cols_str}]"
+                        f"[-] ID column '{id_column}' not found in file.\n"
+                        f"    Available columns: [{cols_str}]"
                     )
 
                 if id_value is not None:
                     gdf = gdf[gdf[id_column].astype(str) == str(id_value)].copy().reset_index(drop=True)
                     if len(gdf) == 0:
-                        raise ValueError(f"❌ Nenhum registro encontrado com {id_column} == '{id_value}'.")
+                        raise ValueError(f"[-] No record found with {id_column} == '{id_value}'.")
                     prop_id = str(id_value)
-                    print(f"🎯 Imóvel filtrado pela coluna '{id_column}' == '{prop_id}'")
+                    print(f"Property filtered by column '{id_column}' == '{prop_id}'")
                 else:
                     prop_id = str(gdf[id_column].iloc[0])
                     if len(gdf) > 1:
-                        print(f"ℹ️ O arquivo possui {len(gdf)} imóveis. Usando o 1º registro ('{prop_id}'). Dica: use id_value='...' para selecionar.")
+                        print(f"File contains {len(gdf)} properties. Using 1st record ('{prop_id}'). Tip: use id_value='...' to select.")
                     else:
-                        print(f"🎯 Imóvel identificado pela coluna '{id_column}': {prop_id}")
+                        print(f"Property identified by column '{id_column}': {prop_id}")
             else:
-                # Tentativa de auto-detecção de colunas comuns de CAR ou ID
+                # Auto-detect common CAR / ID column names
                 candidate_cols = ['cod_imovel', 'codigo_car', 'codigo', 'id', 'gid', 'recibo', 'num_car', 'cod_prop', 'name', 'nome']
                 detected = [c for c in candidate_cols if c in gdf.columns]
                 if detected:
                     auto_col = detected[0]
                     prop_id = str(gdf[auto_col].iloc[0])
-                    print(f"ℹ️ Coluna de ID auto-detectada: '{auto_col}' -> ID do imóvel: {prop_id}")
+                    print(f"Auto-detected ID column: '{auto_col}' -> Property ID: {prop_id}")
                 else:
                     prop_id = os.path.splitext(os.path.basename(target_str))[0]
-                    print(f"ℹ️ Nenhuma coluna de ID informada. Usando nome do arquivo como ID: '{prop_id}'")
+                    print(f"No ID column provided. Using filename as ID: '{prop_id}'")
                     cols_str = ", ".join([f"'{c}'" for c in gdf.columns if c != 'geometry'])
-                    print(f"   (Dica: você pode informar id_column='...' dentre as colunas: [{cols_str}])")
+                    print(f"   (Tip: specify id_column='...' from available columns: [{cols_str}])")
 
             roi_ee = gdf_to_ee_feature_collection(gdf)
             area_ha = round(gdf.to_crs(gdf.estimate_utm_crs()).geometry.area.sum() / 10000.0, 2)
             info = {
-                "tipo": f"arquivo_local_{ext[1:]}",
-                "caminho": target_str,
+                "type": f"local_file_{ext[1:]}",
+                "path": target_str,
                 "features": len(gdf),
                 "id_imovel": prop_id,
                 "cod_imovel": prop_id,
@@ -236,9 +235,9 @@ def resolve_input_roi(
             }
             return roi_ee, gdf, info
 
-        # Verifica se é um asset path do Earth Engine (ex: 'projects/...')
+        # Check if Earth Engine asset path (e.g., 'projects/...')
         if target_str.startswith('projects/') or target_str.startswith('users/'):
-            print(f"📥 Entrada identificada: Asset do Earth Engine -> {target_str}")
+            print(f"Input identified: Earth Engine Asset -> {target_str}")
             fc = ee.FeatureCollection(target_str)
             prop_id = None
             if car_property_filter:
@@ -251,7 +250,7 @@ def resolve_input_roi(
                 prop_id = str(gdf['cod_imovel'].iloc[0])
             prop_id = prop_id or os.path.basename(target_str)
             info = {
-                "tipo": "ee_asset",
+                "type": "ee_asset",
                 "asset_id": target_str,
                 "features": len(gdf),
                 "id_imovel": prop_id,
@@ -259,17 +258,17 @@ def resolve_input_roi(
             }
             return fc, gdf, info
 
-        # Se for string de coordenada: "-15.747, -50.894"
+        # If coordinate string: "-15.747, -50.894"
         if ',' in target_str or ';' in target_str:
             input_target = target_str
 
     # -------------------------------------------------------------
-    # CASO 3: Coordenada Geográfica (Tupla, Lista, Dict ou String)
+    # CASE 3: Geographic Coordinates (Tuple, List, Dict, or String)
     # -------------------------------------------------------------
     if isinstance(input_target, (list, tuple, dict)) or (isinstance(input_target, str) and (',' in input_target or ';' in input_target)):
         lat, lon = parse_lat_lon(input_target)
-        print(f"📥 Entrada identificada: Coordenada [Lat: {lat:.5f}, Lon: {lon:.5f}]")
-        print("🔍 Buscando sobreposição com a base do CAR no Earth Engine...")
+        print(f"Input identified: Geographic Coordinate [Lat: {lat:.5f}, Lon: {lon:.5f}]")
+        print("Searching spatial intersection with CAR assets in Earth Engine...")
 
         pt_ee = ee.Geometry.Point([lon, lat])
         matched_fc = None
@@ -288,20 +287,20 @@ def resolve_input_roi(
                     if 'cod_imovel' in props:
                         matched_cod = first_feat.get('cod_imovel').getInfo()
                     break
-            except Exception as e:
+            except Exception:
                 pass
 
         if matched_fc is not None:
             import geemap
             gdf_car = geemap.ee_to_gdf(matched_fc).to_crs(epsg=4326)
             area_ha = round(gdf_car.to_crs(gdf_car.estimate_utm_crs()).geometry.area.sum() / 10000.0, 2)
-            prop_id = str(matched_cod or "car_imovel")
-            print(f"🎯 Imóvel CAR Localizado com Sucesso!")
-            print(f"   Código CAR:  {prop_id}")
-            print(f"   Asset CAR:   {matched_asset}")
-            print(f"   Área Imóvel: {area_ha:.2f} ha")
+            prop_id = str(matched_cod or "car_property")
+            print(f"CAR Property Successfully Located!")
+            print(f"   CAR Code:      {prop_id}")
+            print(f"   CAR Asset:     {matched_asset}")
+            print(f"   Property Area: {area_ha:.2f} ha")
             info = {
-                "tipo": "coordenada_car_interceptado",
+                "type": "intersected_car_coordinate",
                 "coord": (lat, lon),
                 "id_imovel": prop_id,
                 "cod_imovel": prop_id,
@@ -310,8 +309,8 @@ def resolve_input_roi(
             }
             return matched_fc, gdf_car, info
         else:
-            print(f"⚠️ Nenhum imóvel CAR interceptou a coordenada nos assets cadastrados.")
-            print(f"🌐 Gerando Área de Interesse (AOI) com buffer de {buffer_radius_meters}m ao redor do ponto...")
+            print("Warning: No CAR property intersected the coordinate in the configured assets.")
+            print(f"Generating Area of Interest (AOI) bounding box with {buffer_radius_meters}m buffer around point...")
             aoi_geom = pt_ee.buffer(buffer_radius_meters).bounds()
             roi_ee = ee.FeatureCollection([ee.Feature(aoi_geom, {'tipo': 'buffer_coord'})])
             import geemap
@@ -319,13 +318,13 @@ def resolve_input_roi(
             area_ha = round(gdf_car.to_crs(gdf_car.estimate_utm_crs()).geometry.area.sum() / 10000.0, 2)
             prop_id = f"coord_{lat:.4f}_{lon:.4f}"
             info = {
-                "tipo": "coordenada_buffer_aoi",
+                "type": "coordinate_buffer_aoi",
                 "coord": (lat, lon),
                 "id_imovel": prop_id,
                 "cod_imovel": prop_id,
-                "raio_metros": buffer_radius_meters,
+                "buffer_radius_meters": buffer_radius_meters,
                 "area_ha": area_ha
             }
             return roi_ee, gdf_car, info
 
-    raise ValueError(f"Não foi possível resolver o input_target: {type(input_target)} -> {input_target}")
+    raise ValueError(f"Could not resolve input_target: {type(input_target)} -> {input_target}")

@@ -1,9 +1,9 @@
 """
-Motor de Segmentação Interativa com HQ-SAM (Segment Anything High Quality)
-LAPIG - Laboratório de Processamento de Imagens e Geoprocessamento (UFG)
+Interactive Segmentation Engine with HQ-SAM (Segment Anything High Quality)
+LAPIG - Image Processing and Geoprocessing Laboratory (UFG)
 
-Permite segmentação interativa de parcelas por amostragem pontual (prompts do usuário)
-utilizando o modelo ViT-H com aceleração via GPU NVIDIA.
+Enables interactive parcel segmentation via prompt sampling (user click points)
+utilizing the ViT-H architecture with NVIDIA GPU acceleration.
 """
 
 import os
@@ -39,7 +39,7 @@ import math
 import concurrent.futures
 import requests
 
-# Integração com o módulo oficial s2_mosaic do LAPIG
+# Integration with official LAPIG s2_mosaic module
 try:
     import ee
     from lapig_parcel_segmentation.s2_mosaic import initialize_earth_engine, get_sentinel2_ndvi_mosaic
@@ -65,23 +65,23 @@ class HQSamEngine:
         self.sam = None
         self._init_model()
 
-        # Estado da Sessão Atual
+        # Active Session State
         self.active_roi_id = None
-        self.active_roi_name = "Nenhum"
+        self.active_roi_name = "None"
         self.image_path = None
         self.image_crs = None
         self.image_bounds_wgs84 = None  # [min_lon, min_lat, max_lon, max_lat]
         self.overlay_png_path = None
         self.car_geojson = None
-        self.saved_paddocks = []  # Lista de dicionários com {id, name, area_ha, score, geojson}
+        self.saved_paddocks = []  # List of dictionaries: {id, name, area_ha, score, geojson}
         self.current_prompt_points = []  # [[lon, lat, label], ...]
         self.last_candidate_masks = None
 
-        # Estado de Progresso em Tempo Real (Progress Bar)
+        # Real-time progress bar state
         self.progress = {
             "percent": 0,
             "status": "idle",
-            "title": "Aguardando",
+            "title": "Waiting",
             "message": "",
             "detail": ""
         }
@@ -97,11 +97,11 @@ class HQSamEngine:
 
     def download_sentinel2_with_progress(self, tif_path, bbox, zoom=14):
         """
-        Baixa o mosaico Sentinel-2 Cloudless com atualização de progresso em tempo real tile por tile.
-        bbox: [min_lon, min_lat, max_lon, max_lat] em EPSG:4326
+        Downloads Sentinel-2 Cloudless mosaic updating progress tile-by-tile.
+        bbox: [min_lon, min_lat, max_lon, max_lat] in EPSG:4326
         """
         west, south, east, north = bbox
-        self.set_progress(5, "Calculando grade orbital Sentinel-2...", f"Bbox: [{west:.4f}, {south:.4f}, {east:.4f}, {north:.4f}]", "Divisão de quadrículas")
+        self.set_progress(5, "Calculating Sentinel-2 orbital grid...", f"Bbox: [{west:.4f}, {south:.4f}, {east:.4f}, {north:.4f}]", "Grid partition")
 
         def deg2num(lat, lon, z):
             lat_r = math.radians(lat)
@@ -118,7 +118,7 @@ class HQSamEngine:
         corners = [(x, y) for x in range(min_x, max_x) for y in range(min_y, max_y)]
         total_tiles = len(corners)
 
-        self.set_progress(10, f"Baixando quadrículas Sentinel-2 (0/{total_tiles})...", "Iniciando download paralelo de quadrículas de 10m...", f"Zoom {zoom}")
+        self.set_progress(10, f"Downloading Sentinel-2 tiles (0/{total_tiles})...", "Starting parallel download of 10m tiles...", f"Zoom {zoom}")
 
         session = requests.Session()
         tiles_data = {}
@@ -134,27 +134,27 @@ class HQSamEngine:
                     img = Image.open(io.BytesIO(r.content)).convert("RGB")
                     tiles_data[(x, y)] = img
                 else:
-                    # Tenta fallback
+                    # Fallback
                     r_fb = session.get(SENTINEL2_FALLBACK_TMS.format(z=zoom, x=x, y=y), timeout=15)
                     if r_fb.status_code == 200:
                         img = Image.open(io.BytesIO(r_fb.content)).convert("RGB")
                         tiles_data[(x, y)] = img
             except Exception as e:
-                print(f"Aviso no download da quadrícula ({x}, {y}): {e}")
+                print(f"Notice downloading tile ({x}, {y}): {e}")
 
             downloaded += 1
-            pct = 10 + int((downloaded / max(1, total_tiles)) * 60)  # 10% a 70%
+            pct = 10 + int((downloaded / max(1, total_tiles)) * 60)  # 10% to 70%
             self.set_progress(
                 pct,
-                f"Baixando quadrículas Sentinel-2 ({downloaded}/{total_tiles})...",
-                f"Recebidos dados da quadrícula ({x}, {y})",
-                f"Progresso: {pct}%"
+                f"Downloading Sentinel-2 tiles ({downloaded}/{total_tiles})...",
+                f"Received tile data ({x}, {y})",
+                f"Progress: {pct}%"
             )
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             list(executor.map(fetch_tile, corners))
 
-        self.set_progress(72, "Montando mosaico Sentinel-2...", "Costurando imagens e gerando GeoTIFF georreferenciado...", "Composição RGB")
+        self.set_progress(72, "Assembling Sentinel-2 mosaic...", "Stitching tiles and generating georeferenced GeoTIFF...", "RGB Composition")
 
         tile_w, tile_h = 256, 256
         cols = max_x - min_x
@@ -171,7 +171,7 @@ class HQSamEngine:
         frac_h = abs(y1 - y0) * tile_h
         cropped_img = big_img.crop((round(frac_x0), round(frac_y0), round(frac_x0 + frac_w), round(frac_y0 + frac_h)))
 
-        self.set_progress(80, "Gravando arquivo GeoTIFF...", f"Dimensões: {cropped_img.width}x{cropped_img.height} pixels (3 bandas RGB)", "Projeção EPSG:3857")
+        self.set_progress(80, "Writing GeoTIFF file...", f"Dimensions: {cropped_img.width}x{cropped_img.height} pixels (3 RGB bands)", "EPSG:3857 Projection")
 
         EARTH_RADIUS = 6378137.0
         def from4326_to3857(lat, lon):
@@ -200,23 +200,23 @@ class HQSamEngine:
             for i in range(3):
                 dst.write(arr[:, :, i], i + 1)
 
-        self.set_progress(85, "GeoTIFF Sentinel-2 gravado!", "Preparando camada de visualização espectral...", "Concluído")
+        self.set_progress(85, "Sentinel-2 GeoTIFF written!", "Preparing spectral visualization overlay...", "Done")
 
     def _init_model(self):
-        """Inicializa o modelo HQ-SAM na GPU uma única vez."""
+        """Initializes the HQ-SAM model on GPU once."""
         if SamGeo is None:
-            print("⚠️ samgeo.hq_sam não encontrado.")
+            print("Notice: samgeo.hq_sam not found.")
             return
 
-        print(f"🚀 Inicializando HQ-SAM (Modelo: {self.model_type})...")
+        print(f"Initializing HQ-SAM (Architecture: {self.model_type})...")
         try:
             self.sam = SamGeo(model_type=self.model_type, automatic=False, device=self.device)
-            print("✅ HQ-SAM inicializado com sucesso na GPU!")
+            print("HQ-SAM initialized successfully on GPU!")
         except Exception as e:
-            print(f"❌ Erro ao inicializar HQ-SAM: {e}")
+            print(f"[-] Error initializing HQ-SAM: {e}")
 
     def get_presets(self, results_dir="results", gpkg_path="car_goias_area_imovel_epsg4674_hottest.gpkg"):
-        """Retorna lista de fazendas de demonstração pré-processadas e prontas para uso."""
+        """Returns list of pre-processed demonstration farms ready for immediate interaction."""
         presets = []
         car_dict = {}
         if os.path.exists(gpkg_path) and gpd is not None:
@@ -230,7 +230,7 @@ class HQSamEngine:
             except Exception:
                 pass
 
-        # Adiciona conhecidos
+        # Known presets
         car_dict['MS-5006309-8DC93A48C2424FD7B3EDF235F8B531E1'] = {'municipio': 'Paranaíba (MS)', 'num_area': 1085.22}
         car_dict['GO-5211008-46C08C6235D74D36BE07B5384A17B156'] = {'municipio': 'Itapirapuã (GO)', 'num_area': 193.59}
 
@@ -252,11 +252,11 @@ class HQSamEngine:
         return presets
 
     def _generate_overlay_png(self, tif_path, output_png_path):
-        """Gera um PNG (RGBA ou RGB) normalizado para exibição no Leaflet."""
+        """Generates a normalized PNG (RGBA or RGB) for Leaflet map overlay."""
         with rasterio.open(tif_path) as src:
             arr = src.read()
             if arr.shape[0] >= 4:
-                # 4 bandas (RGBA gerado pelo s2_mosaic / geemap)
+                # 4 bands (RGBA from s2_mosaic / geemap)
                 rgba = np.transpose(arr[:4], (1, 2, 0))
                 if rgba.dtype != np.uint8:
                     p2, p98 = np.percentile(rgba[:, :, :3], (2, 98))
@@ -265,7 +265,7 @@ class HQSamEngine:
                     rgba = np.dstack([rgb_scaled, alpha])
                 img = Image.fromarray(rgba, "RGBA")
             elif arr.shape[0] >= 3:
-                # 3 bandas RGB
+                # 3 RGB bands
                 rgb = np.transpose(arr[:3], (1, 2, 0))
                 if rgb.dtype != np.uint8:
                     p2, p98 = np.percentile(rgb, (2, 98))
@@ -282,14 +282,14 @@ class HQSamEngine:
 
     def acquire_sentinel2_image(self, roi_geometry_or_point, output_tif_path, buffer_m=1000, fallback_bbox=None, year=2024):
         """
-        Adquire imagem Sentinel-2 utilizando prioritariamente o módulo s2_mosaic (Google Earth Engine)
-        do LAPIG com o cálculo do mosaico multi-temporal de NDVI e máscara Cloud Score Plus (CS+).
-        Caso ocorra qualquer indisponibilidade no Earth Engine, utiliza o fallback com progresso tile-por-tile.
+        Acquires Sentinel-2 imagery prioritizing LAPIG's s2_mosaic (Google Earth Engine)
+        with multi-temporal NDVI statistical composite and Cloud Score Plus (CS+) mask.
+        In case of Earth Engine unavailability, falls back to tile-by-tile download.
         """
         success = False
         if get_sentinel2_ndvi_mosaic is not None:
             try:
-                self.set_progress(15, "Conectando ao Google Earth Engine...", "Inicializando projeto ee-vieiramesquita...", "s2_mosaic")
+                self.set_progress(15, "Connecting to Google Earth Engine...", "Initializing ee-vieiramesquita project...", "s2_mosaic")
                 initialize_earth_engine(project='ee-vieiramesquita')
                 import ee
 
@@ -312,8 +312,8 @@ class HQSamEngine:
                     roi_ee = ee.Feature(roi_geometry_or_point)
                     buf_meters = int(buffer_m)
 
-                self.set_progress(35, "Consultando catálogo Sentinel-2 (GEE)...", f"Mosaico multi-temporal NDVI {year} com Cloud Score Plus (cs_cdf >= 0.65)...", "s2_mosaic")
-                print(f"🛰️ Executando s2_mosaic via Earth Engine (ano {year}, buffer {buf_meters}m)...")
+                self.set_progress(35, "Querying Sentinel-2 catalog (GEE)...", f"Multi-temporal NDVI {year} mosaic with Cloud Score Plus (cs_cdf >= 0.65)...", "s2_mosaic")
+                print(f"Executing s2_mosaic via Earth Engine (year {year}, buffer {buf_meters}m)...")
 
                 _, out_path, _ = get_sentinel2_ndvi_mosaic(
                     roi_ee=roi_ee,
@@ -326,11 +326,11 @@ class HQSamEngine:
                 )
 
                 if os.path.exists(output_tif_path) and os.path.getsize(output_tif_path) > 1000:
-                    self.set_progress(78, "Mosaico Sentinel-2 gerado com sucesso!", f"Arquivo: {os.path.basename(output_tif_path)} ({os.path.getsize(output_tif_path)/1024:.1f} KB)", "s2_mosaic")
-                    print(f"✅ Imagem Sentinel-2 adquirida via s2_mosaic: {output_tif_path}")
+                    self.set_progress(78, "Sentinel-2 mosaic generated successfully!", f"File: {os.path.basename(output_tif_path)} ({os.path.getsize(output_tif_path)/1024:.1f} KB)", "s2_mosaic")
+                    print(f"Sentinel-2 image acquired via s2_mosaic: {output_tif_path}")
                     success = True
             except Exception as e:
-                print(f"⚠️ Erro ao obter imagem via s2_mosaic: {e}. Acionando fallback...")
+                print(f"Warning obtaining image via s2_mosaic: {e}. Triggering fallback...")
 
         if not success:
             if fallback_bbox is None:
@@ -342,36 +342,36 @@ class HQSamEngine:
                 else:
                     fallback_bbox = [-49.5, -16.5, -49.4, -16.4]
 
-            self.set_progress(20, "Obtendo Sentinel-2 via serviço orbital...", f"Baixando quadrículas para bbox {fallback_bbox}...", "Fallback TMS")
+            self.set_progress(20, "Obtaining Sentinel-2 via orbital tile service...", f"Downloading tiles for bbox {fallback_bbox}...", "Fallback TMS")
             self.download_sentinel2_with_progress(output_tif_path, bbox=fallback_bbox, zoom=14)
 
     def load_preset(self, preset_id, results_dir="results", gpkg_path="car_goias_area_imovel_epsg4674_hottest.gpkg"):
-        """Carrega uma fazenda pré-processada do projeto."""
-        self.set_progress(10, "Carregando Fazenda Pré-processada...", f"Buscando mosaico Sentinel-2 de {preset_id[:16]}...", "Lendo arquivos")
+        """Loads a pre-processed farm into the interactive session."""
+        self.set_progress(10, "Loading Pre-processed Farm...", f"Fetching Sentinel-2 mosaic for {preset_id[:16]}...", "Reading files")
         folder = os.path.join(results_dir, preset_id)
         s2_tif = os.path.join(folder, "s2_ndvi_rgb.tif")
         if not os.path.exists(s2_tif):
-            self.set_progress(0, "Erro ao carregar", f"Imagem não encontrada: {s2_tif}", status="error")
-            raise FileNotFoundError(f"Imagem Sentinel-2 não encontrada em: {s2_tif}")
+            self.set_progress(0, "Error loading", f"Image not found: {s2_tif}", status="error")
+            raise FileNotFoundError(f"Sentinel-2 image not found at: {s2_tif}")
 
-        # Limpa sessão
+        # Clear session
         self.clear_session()
         self.active_roi_id = preset_id
         self.image_path = s2_tif
 
-        self.set_progress(30, "Lendo metadados espaciais...", "Extraindo CRS e bounding box em WGS84...", "Projeções")
+        self.set_progress(30, "Reading spatial metadata...", "Extracting CRS and bounding box in WGS84...", "Projections")
         with rasterio.open(s2_tif) as src:
             self.image_crs = str(src.crs)
             self.image_bounds_wgs84 = list(transform_bounds(src.crs, "EPSG:4326", *src.bounds))
 
-        # Gerar PNG overlay temporário
-        self.set_progress(50, "Gerando camada espectral...", "Normalizando contraste RGB para o mapa...", "Visualização")
+        # Generate temporary overlay PNG
+        self.set_progress(50, "Generating spectral overlay...", "Normalizing RGB contrast for map rendering...", "Visualization")
         cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cache")
         os.makedirs(cache_dir, exist_ok=True)
         self.overlay_png_path = os.path.join(cache_dir, f"overlay_{preset_id}.png")
         self._generate_overlay_png(s2_tif, self.overlay_png_path)
 
-        # Buscar geometria CAR
+        # Retrieve CAR geometry
         self.car_geojson = None
         if os.path.exists(gpkg_path) and gpd is not None:
             try:
@@ -381,19 +381,19 @@ class HQSamEngine:
                     self.active_roi_name = str(match.iloc[0].get('municipio', 'Goiás'))
                     self.car_geojson = json.loads(match.to_crs("EPSG:4326").to_json())['features'][0]
             except Exception as e:
-                print(f"Aviso ao buscar CAR no GPKG: {e}")
+                print(f"Notice searching CAR in GPKG: {e}")
 
-        # Carregar imagem no encoder do HQ-SAM
+        # Load image into HQ-SAM image encoder
         if self.sam is not None:
-            self.set_progress(75, "Alocando tensores na GPU...", "Executando encoder ViT-H na NVIDIA RTX 2080 Ti...", "Rede Neural")
-            print(f"🔄 Carregando GeoTIFF no encoder HQ-SAM: {s2_tif}...")
+            self.set_progress(75, "Allocating GPU tensors...", "Running ViT-H image encoder on NVIDIA GPU...", "Neural Network")
+            print(f"Loading GeoTIFF into HQ-SAM image encoder: {s2_tif}...")
             self.sam.set_image(s2_tif)
-            print("✅ Imagem embutida na GPU!")
+            print("Image embeddings computed on GPU!")
 
         center_lon = (self.image_bounds_wgs84[0] + self.image_bounds_wgs84[2]) / 2
         center_lat = (self.image_bounds_wgs84[1] + self.image_bounds_wgs84[3]) / 2
 
-        self.set_progress(100, "Concluído!", "Propriedade carregada e pronta para segmentação!", "Pronto", status="done")
+        self.set_progress(100, "Completed!", "Property loaded and ready for segmentation!", "Ready", status="done")
 
         return {
             "roi_id": self.active_roi_id,
@@ -405,7 +405,7 @@ class HQSamEngine:
         }
 
     def _find_preset_for_point(self, lat, lon):
-        """Verifica se uma coordenada geográfica coincide com algum dos imóveis já processados."""
+        """Checks if a geographic coordinate falls inside an already processed property."""
         presets = self.get_presets()
         for p in presets:
             tif = p.get('tif_path')
@@ -421,18 +421,17 @@ class HQSamEngine:
 
     def load_coordinates(self, lat, lon, buffer_m=2000, **kwargs):
         """
-        Carrega a área de interesse baseada em coordenadas geográficas.
-        O modelo HQ-SAM SEMPRE processará imagens do Sentinel-2 (padrão oficial),
-        geradas prioritariamente com o módulo s2_mosaic do LAPIG.
+        Loads area of interest from geographic coordinates.
+        The HQ-SAM model always processes Sentinel-2 imagery (official standard).
         """
-        # Se as coordenadas estiverem dentro de uma fazenda já processada com Sentinel-2 NDVI, aproveita diretamente
+        # If coordinates lie within a pre-processed farm, load directly
         matched_preset = self._find_preset_for_point(lat, lon)
         if matched_preset:
-            self.set_progress(15, "Coordenadas identificadas em imóvel pré-processado!", f"Aproveitando dados Sentinel-2 de {matched_preset}...")
-            print(f"🎯 Coordenadas coincidem com a fazenda pré-processada: {matched_preset}")
+            self.set_progress(15, "Coordinates matched pre-processed property!", f"Reusing Sentinel-2 data from {matched_preset}...")
+            print(f"Coordinates match pre-processed farm: {matched_preset}")
             return self.load_preset(matched_preset)
 
-        # Calcula bounding box em WGS84 para fallback se necessário
+        # Calculate bounding box in WGS84 for fallback
         delta_lat = buffer_m / 111320.0
         delta_lon = buffer_m / (111320.0 * np.cos(np.radians(lat)))
         min_lon = lon - delta_lon
@@ -451,7 +450,7 @@ class HQSamEngine:
         os.makedirs(cache_dir, exist_ok=True)
         tif_path = os.path.join(cache_dir, f"{roi_id}.tif")
 
-        # Adquire via s2_mosaic
+        # Acquire via s2_mosaic
         self.acquire_sentinel2_image(
             roi_geometry_or_point=(lat, lon),
             output_tif_path=tif_path,
@@ -465,17 +464,17 @@ class HQSamEngine:
             self.image_crs = str(src.crs)
             self.image_bounds_wgs84 = list(transform_bounds(src.crs, "EPSG:4326", *src.bounds))
 
-        self.set_progress(88, "Gerando camada espectral...", "Normalizando contraste RGB para visualização no mapa...")
+        self.set_progress(88, "Generating spectral overlay...", "Normalizing RGB contrast for map rendering...")
         self.overlay_png_path = os.path.join(cache_dir, f"overlay_{roi_id}.png")
         self._generate_overlay_png(tif_path, self.overlay_png_path)
 
         if self.sam is not None:
-            self.set_progress(92, "Calculando embeddings na GPU...", "Processando tensores no ViT-H (RTX 2080 Ti)...")
-            print("🔄 Embutindo Sentinel-2 no encoder HQ-SAM...")
+            self.set_progress(92, "Computing embeddings on GPU...", "Processing tensors on ViT-H (RTX 2080 Ti)...")
+            print("Embedding Sentinel-2 in HQ-SAM encoder...")
             self.sam.set_image(tif_path)
-            print("✅ Sentinel-2 pronto para segmentação por amostragem!")
+            print("Sentinel-2 ready for prompt-based interactive segmentation!")
 
-        self.set_progress(100, "Concluído!", "Área carregada e pronta para segmentação!", status="done")
+        self.set_progress(100, "Completed!", "Area loaded and ready for segmentation!", status="done")
 
         return {
             "roi_id": self.active_roi_id,
@@ -487,8 +486,8 @@ class HQSamEngine:
         }
 
     def load_car_id(self, car_id, gpkg_path="car_goias_area_imovel_epsg4674_hottest.gpkg"):
-        """Busca um imóvel pelo código CAR e carrega a imagem Sentinel-2 correspondente."""
-        self.set_progress(10, "Buscando imóvel no CAR...", f"Pesquisando código {car_id[:16]}... no banco vetorial")
+        """Searches property by CAR code and loads the corresponding Sentinel-2 imagery."""
+        self.set_progress(10, "Searching property in CAR...", f"Searching code {car_id[:16]}... in vector database")
         if os.path.exists(gpkg_path) and gpd is not None:
             gdf = gpd.read_file(gpkg_path)
             match = gdf[gdf['cod_imovel'] == car_id]
@@ -498,16 +497,15 @@ class HQSamEngine:
                 c_lon = (bounds[0] + bounds[2]) / 2
                 c_lat = (bounds[1] + bounds[3]) / 2
 
-                # Se já tiver processado nos results com Sentinel-2 multi-temporal, usa direto
+                # If already processed with multi-temporal Sentinel-2, load directly
                 results_s2 = os.path.join("results", car_id, "s2_ndvi_rgb.tif")
                 if os.path.exists(results_s2):
-                    self.set_progress(20, "Imóvel localizado no banco pré-processado!", "Carregando Sentinel-2 multi-temporal...")
+                    self.set_progress(20, "Property located in pre-processed database!", "Loading multi-temporal Sentinel-2...")
                     return self.load_preset(car_id, gpkg_path=gpkg_path)
 
-                # Geometria original do CAR
                 geom_shp = match_4326.geometry.iloc[0]
 
-                # Buffer de 15% para contexto da cerca externa
+                # 15% buffer for external fence context
                 width = bounds[2] - bounds[0]
                 height = bounds[3] - bounds[1]
                 bbox = [
@@ -527,7 +525,7 @@ class HQSamEngine:
                 os.makedirs(cache_dir, exist_ok=True)
                 tif_path = os.path.join(cache_dir, f"{roi_id}.tif")
 
-                # Adquire imagem via s2_mosaic
+                # Acquire image via s2_mosaic
                 self.acquire_sentinel2_image(
                     roi_geometry_or_point=geom_shp,
                     output_tif_path=tif_path,
@@ -541,17 +539,17 @@ class HQSamEngine:
                     self.image_crs = str(src.crs)
                     self.image_bounds_wgs84 = list(transform_bounds(src.crs, "EPSG:4326", *src.bounds))
 
-                self.set_progress(88, "Gerando camada espectral...", "Normalizando contraste RGB para visualização...")
+                self.set_progress(88, "Generating spectral overlay...", "Normalizing RGB contrast for map rendering...")
                 self.overlay_png_path = os.path.join(cache_dir, f"overlay_{roi_id}.png")
                 self._generate_overlay_png(tif_path, self.overlay_png_path)
 
                 if self.sam is not None:
-                    self.set_progress(92, "Calculando embeddings na GPU...", "Processando tensores no ViT-H...")
-                    print("🔄 Embutindo Sentinel-2 no encoder HQ-SAM...")
+                    self.set_progress(92, "Computing embeddings on GPU...", "Processing tensors on ViT-H...")
+                    print("Embedding Sentinel-2 in HQ-SAM encoder...")
                     self.sam.set_image(tif_path)
-                    print("✅ Sentinel-2 carregado na GPU!")
+                    print("Sentinel-2 loaded into GPU memory!")
 
-                self.set_progress(100, "Concluído!", "Imóvel CAR pronto para segmentação!", status="done")
+                self.set_progress(100, "Completed!", "CAR property ready for segmentation!", status="done")
 
                 return {
                     "roi_id": self.active_roi_id,
@@ -562,27 +560,27 @@ class HQSamEngine:
                     "has_overlay": True
                 }
 
-        self.set_progress(0, "Erro ao localizar CAR", f"Código {car_id} não encontrado na base local.", status="error")
-        raise ValueError(f"Código CAR '{car_id}' não encontrado na base local.")
+        self.set_progress(0, "Error locating CAR", f"CAR code {car_id} not found in local database.", status="error")
+        raise ValueError(f"CAR code '{car_id}' not found in local database.")
 
     def predict_prompts(self, points, multimask=False):
         """
-        Executa inferência com pontos de amostragem no Sentinel-2.
-        Gera uma feição individual isolada por ponto (sem agregar ou agrupar outros polígonos).
+        Executes prompt-based inference with sampling points on Sentinel-2 imagery.
+        Generates an individual isolated feature per prompt without grouping other parcels.
         """
         if self.sam is None or self.image_path is None:
-            raise RuntimeError("Nenhuma imagem Sentinel-2 carregada no HQ-SAM.")
+            raise RuntimeError("No Sentinel-2 image loaded in HQ-SAM.")
 
         if not points:
-            raise ValueError("Nenhum ponto fornecido.")
+            raise ValueError("No prompt points provided.")
 
         point_coords = [[p['lon'], p['lat']] for p in points]
         point_labels = [int(p.get('label', 1)) for p in points]
 
-        # Salva pontos atuais da sessão
+        # Save current session points
         self.current_prompt_points = points
 
-        # Executa predição SAM HQ sobre o Sentinel-2
+        # Execute SAM HQ prediction over Sentinel-2
         masks, scores, logits = self.sam.predict(
             point_coords=point_coords,
             point_labels=point_labels,
@@ -598,10 +596,9 @@ class HQSamEngine:
         project_to_wgs84 = pyproj.Transformer.from_crs(src_crs, "EPSG:4326", always_xy=True).transform
         project_to_src = pyproj.Transformer.from_crs("EPSG:4326", src_crs, always_xy=True).transform
 
-        # Ponto de referência e lista de pontos positivos e negativos para isolar e seccionar a feição da parcela
         pos_points = [p for p in points if int(p.get('label', 1)) == 1]
         neg_points = [p for p in points if int(p.get('label', 1)) == 0]
-        
+
         src_pos_pts = []
         for p in pos_points:
             rx, ry = project_to_src(p['lon'], p['lat'])
@@ -618,7 +615,7 @@ class HQSamEngine:
             rx, ry = project_to_src(points[0]['lon'], points[0]['lat'])
             target_pt = Point(rx, ry)
 
-        # Prepara união das parcelas já salvas no CRS do raster para prevenção de sobreposição em tempo real
+        # Prepare union of already saved parcels in raster CRS for real-time overlap prevention
         saved_src_union = None
         if self.saved_paddocks:
             saved_src_geoms = []
@@ -639,7 +636,7 @@ class HQSamEngine:
             m = masks[i]
             score = float(scores[i])
 
-            # Vetoriza o binário
+            # Vectorize binary mask
             polys = []
             for geom, val in shapes(m.astype(np.uint8), transform=src_trans):
                 if val == 1:
@@ -654,7 +651,7 @@ class HQSamEngine:
             if not polys:
                 continue
 
-            # Seleciona o polígono que engloba a maior quantidade de pontos positivos amostrados
+            # Select polygon enclosing highest number of sampled positive points
             best_poly = None
             max_contained = -1
             min_dist = float('inf')
@@ -673,7 +670,7 @@ class HQSamEngine:
 
             selected_poly = best_poly or polys[0]
 
-            # Se por ventura for MultiPolygon, seleciona a parte que contém mais pontos ou está mais perto
+            # If MultiPolygon, select component with most positive points or closest
             if isinstance(selected_poly, MultiPolygon):
                 parts = list(selected_poly.geoms)
                 best_part = None
@@ -691,20 +688,19 @@ class HQSamEngine:
                         best_part = part
                 selected_poly = best_part or parts[0]
 
-            # 1. Corte por Hiperplano Bissetor / Mediatriz (Eq. 1 do artigo SBSR)
-            # Quando há ponto negativo, traça o hiperplano normal no ponto médio e retém o semiplano positivo
+            # 1. Perpendicular Bisector Cut (Eq. 1 in scientific paper)
+            # When negative point exists, trace normal hyperplane at midpoint and retain positive half-plane
             if src_neg_pts and src_pos_pts:
                 for neg_pt in src_neg_pts:
                     if selected_poly.contains(neg_pt) or selected_poly.distance(neg_pt) < 15.0:
                         closest_pos = min(src_pos_pts, key=lambda pt: pt.distance(neg_pt))
                         selected_poly = self._clip_polygon_by_bisector(selected_poly, closest_pos, neg_pt)
 
-            # 2. Prevenção de Sobreposição em Tempo Real com Parcelas já Existentes (0% Overlap)
+            # 2. Real-Time Zero-Overlap Enforcement with Existing Parcels (0% Overlap)
             if saved_src_union is not None and selected_poly.intersects(saved_src_union):
                 diff = selected_poly.difference(saved_src_union)
                 if not diff.is_empty:
                     if isinstance(diff, MultiPolygon):
-                        # Retém a componente mais próxima ou que contém os pontos positivos
                         best_part = None
                         max_c = -1
                         min_d = float('inf')
@@ -722,16 +718,16 @@ class HQSamEngine:
                     if isinstance(diff, Polygon) and diff.area > 0:
                         selected_poly = Polygon(diff.exterior)
 
-            # Calcula área em hectares
+            # Calculate area in hectares
             area_ha = 0.0
             if src_crs.is_projected:
                 area_ha = round(selected_poly.area / 10000.0, 2)
             else:
                 area_ha = self._calc_area_ha(selected_poly, is_wgs84=True)
 
-            # Converte para WGS84 GeoJSON
+            # Convert to WGS84 GeoJSON
             poly_wgs84 = shp_transform(project_to_wgs84, selected_poly)
-            # Simplifica levemente mantendo topologia (precisão sub-métrica)
+            # Light simplification preserving topology
             poly_wgs84_simplified = poly_wgs84.simplify(0.00002, preserve_topology=True)
 
             results.append({
@@ -741,7 +737,7 @@ class HQSamEngine:
                 "geojson": mapping(poly_wgs84_simplified)
             })
 
-        # Ordena por score decrescente
+        # Sort descending by confidence score
         results.sort(key=lambda x: x['confidence_score'], reverse=True)
         self.last_candidate_masks = results
         return results
@@ -749,8 +745,8 @@ class HQSamEngine:
     @staticmethod
     def _clip_polygon_by_bisector(polygon, pos_pt, neg_pt):
         """
-        Corta o polígono pelo hiperplano mediatriz entre pos_pt e neg_pt (Eq. 1 do artigo).
-        Retém a porção no semiplano que contém pos_pt.
+        Clips polygon by perpendicular bisector hyperplane between pos_pt and neg_pt (Eq. 1 in paper).
+        Retains the half-plane containing pos_pt.
         """
         p_pos = np.array([pos_pt.x, pos_pt.y])
         p_neg = np.array([neg_pt.x, neg_pt.y])
@@ -790,7 +786,7 @@ class HQSamEngine:
 
     @staticmethod
     def _calc_area_ha(geom, is_wgs84=True):
-        """Calcula a área precisa em hectares."""
+        """Calculates accurate surface area in hectares."""
         if not is_wgs84:
             return round(geom.area / 10000.0, 2)
         c_lat = (geom.bounds[1] + geom.bounds[3]) / 2.0
@@ -799,15 +795,15 @@ class HQSamEngine:
         return round(area_m2 / 10000.0, 2)
 
     def save_paddock(self, paddock_data, prevent_overlap=True):
-        """Salva uma parcela confirmada garantindo estanqueidade topológica (0% de sobreposição com outras)."""
+        """Saves a confirmed parcel ensuring watertight topology (0% overlap with existing parcels)."""
         pid = paddock_data.get('id') or str(uuid.uuid4())[:8]
-        name = paddock_data.get('name') or f"Parcela {len(self.saved_paddocks) + 1}"
-        
+        name = paddock_data.get('name') or f"Parcel {len(self.saved_paddocks) + 1}"
+
         poly_shp = shape(paddock_data.get('geojson'))
         if not poly_shp.is_valid:
             poly_shp = poly_shp.buffer(0)
 
-        # Prevenção rigorosa de sobreposição mútua
+        # Rigorous mutual overlap prevention
         if prevent_overlap and self.saved_paddocks:
             saved_geoms = []
             for sp in self.saved_paddocks:
@@ -844,7 +840,7 @@ class HQSamEngine:
         return record
 
     def update_paddock(self, paddock_id, paddock_data):
-        """Atualiza a geometria e métricas de uma parcela existente garantindo topologia limpa."""
+        """Updates geometry and metrics of an existing parcel ensuring clean topology."""
         for p in self.saved_paddocks:
             if p['id'] == paddock_id:
                 if 'name' in paddock_data and paddock_data['name']:
@@ -857,8 +853,8 @@ class HQSamEngine:
                     poly_shp = shape(paddock_data['geojson'])
                     if not poly_shp.is_valid:
                         poly_shp = poly_shp.buffer(0)
-                    
-                    # Subtrai outras parcelas (exceto a própria)
+
+                    # Subtract other parcels (excluding itself)
                     other_geoms = [shape(sp['geojson']) for sp in self.saved_paddocks if sp['id'] != paddock_id and sp.get('geojson')]
                     if other_geoms:
                         other_union = unary_union(other_geoms)
@@ -874,12 +870,12 @@ class HQSamEngine:
                     p['geojson'] = mapping(poly_shp)
                     p['area_ha'] = self._calc_area_ha(poly_shp, is_wgs84=True)
                 return p
-        raise ValueError(f"Parcela {paddock_id} não encontrada.")
+        raise ValueError(f"Parcel {paddock_id} not found.")
 
     def regularize_paddocks_topology(self, straight_tol=18.0):
         """
-        Reconstrói todas as parcelas da sessão em um Grafo Planar Estanque (Watertight Planar Graph).
-        Retifica cercas comuns via distância de Hausdorff, elimina frestas/slivers e garante 0% de sobreposições mútuas.
+        Reconstructs all session parcels into a Watertight Planar Graph.
+        Rectifies shared fences via Hausdorff distance, eliminates gaps/slivers, and guarantees 0% mutual overlap.
         """
         if not self.saved_paddocks:
             return {"status": "no_paddocks", "count": 0, "paddocks": []}
@@ -891,7 +887,7 @@ class HQSamEngine:
             self.saved_paddocks[0]['area_ha'] = self._calc_area_ha(p_clean, is_wgs84=True)
             return {"status": "success", "count": 1, "paddocks": self.saved_paddocks, "total_area_ha": self.saved_paddocks[0]['area_ha']}
 
-        # 1. Carrega geometrias em GeoDataFrame
+        # 1. Load geometries into GeoDataFrame
         records = []
         for p in self.saved_paddocks:
             geom = shape(p['geojson'])
@@ -903,13 +899,13 @@ class HQSamEngine:
         utm_crs = gdf.estimate_utm_crs()
         gdf_utm = gdf.to_crs(utm_crs)
 
-        # 2. Decomposição em Grafo Planar
+        # 2. Planar Graph Decomposition
         boundaries = [poly.boundary for poly in gdf_utm.geometry if poly.is_valid and not poly.is_empty]
         noded = shapely.node(unary_union(boundaries))
         merged = linemerge(noded)
         lines = merged.geoms if isinstance(merged, MultiLineString) else [merged]
 
-        # 3. Retificação dos Lances de Cerca Compartilhados
+        # 3. Rectify Shared Fence Lines
         straight_lines = []
         for line in lines:
             if line.length < 5.0:
@@ -922,14 +918,14 @@ class HQSamEngine:
             else:
                 straight_lines.append(line.simplify(straight_tol * 0.75, preserve_topology=True))
 
-        # 4. Reconstrução Planar (Polygonize)
+        # 4. Planar Reconstruction (Polygonize)
         noded_straight = shapely.node(unary_union(straight_lines))
         reconstructed = list(polygonize(noded_straight))
 
-        # 5. Atribuição de Células às Parcelas Originais
+        # 5. Cell Assignment to Original Parcels
         assigned_cells = {p['id']: [] for p in self.saved_paddocks}
         for cell in reconstructed:
-            if cell.area < 100.0:  # Descarta micro-ruídos menores que 100m²
+            if cell.area < 100.0:  # Discard micro-noise under 100m²
                 continue
             best_id = None
             max_inter = 0.0
@@ -941,7 +937,7 @@ class HQSamEngine:
             if best_id and max_inter > (cell.area * 0.2):
                 assigned_cells[best_id].append(cell)
 
-        # 6. Atualização das Parcelas Salvas
+        # 6. Update Saved Parcels
         updated_paddocks = []
         for p in self.saved_paddocks:
             pid = p['id']
@@ -952,8 +948,8 @@ class HQSamEngine:
                     u_poly = max(u_poly.geoms, key=lambda g: g.area)
                 if isinstance(u_poly, Polygon):
                     u_poly = Polygon(u_poly.exterior)
-                
-                # Converte de volta para WGS84
+
+                # Convert back to WGS84
                 gdf_single = gpd.GeoDataFrame([{'geometry': u_poly}], crs=utm_crs).to_crs("EPSG:4326")
                 geom_wgs84 = gdf_single.geometry.iloc[0]
                 p['geojson'] = mapping(geom_wgs84)
@@ -969,12 +965,12 @@ class HQSamEngine:
         }
 
     def delete_paddock(self, paddock_id):
-        """Remove uma parcela por ID."""
+        """Removes a parcel by ID."""
         self.saved_paddocks = [p for p in self.saved_paddocks if p['id'] != paddock_id]
         return len(self.saved_paddocks)
 
     def clear_session(self):
-        """Limpa parcelas e rascunhos da sessão atual."""
+        """Clears active session parcels and temporary scratch data."""
         self.saved_paddocks = []
         self.current_prompt_points = []
         self.last_candidate_masks = None
@@ -982,4 +978,3 @@ class HQSamEngine:
         self.active_roi_id = None
         self.overlay_png_path = None
         self.car_geojson = None
-
