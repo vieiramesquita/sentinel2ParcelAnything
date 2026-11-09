@@ -462,6 +462,8 @@ python interactive_hq_sam/run_interactive_app.py --port 8088
 Open in your browser:
 👉 **`http://localhost:8088/`**
 
+![Interactive Cadastral Web UI](images/fig_interactive_ui.png)
+
 ---
 
 ### 8.2. Step-by-Step Operator Workflow
