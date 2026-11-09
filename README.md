@@ -2,18 +2,150 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](https://python.org)
 [![PyTorch CUDA](https://img.shields.io/badge/PyTorch-CUDA%20Accelerated-EE4C2C.svg?logo=pytorch&logoColor=white)](https://pytorch.org)
-[![SAMGeo](https://img.shields.io/badge/Segment%20Anything-ViT--H%20Deep%20Learning-0080FF.svg)](https://samgeo.gishat.org)
+[![Meta SAM](https://img.shields.io/badge/Meta%20AI-Segment%20Anything%20(ViT--H)-0080FF.svg)](https://segment-anything.com)
+[![SAMGeo](https://img.shields.io/badge/SAMGeo-segment--geospatial-34D399.svg)](https://samgeo.gishat.org)
 [![Google Earth Engine](https://img.shields.io/badge/Google%20Earth%20Engine-Sentinel--2%20CS%2B-2BA55D.svg?logo=googleearthengine&logoColor=white)](https://earthengine.google.com)
-[![Topology](https://img.shields.io/badge/Topology-Watertight%20(Zero%20Overlaps)-success.svg)](#️-3-pipeline-architecture)
-[![Performance](https://img.shields.io/badge/Performance-5.9%20min%2Ffarm%20(RTX%202080%20Ti)-orange.svg)](#-2-computational-performance--hardware-benchmarks)
-[![Audited Benchmark](https://img.shields.io/badge/Benchmark-21%20Properties%20%7C%2049.8k%20ha-blue.svg)](#-2-computational-performance--hardware-benchmarks)
+[![Topology](https://img.shields.io/badge/Topology-Watertight%20(Zero%20Overlaps)-success.svg)](#-13-what-we-are-doing-lapig-parcelanything)
+[![Performance](https://img.shields.io/badge/Performance-5.9%20min%2Ffarm%20(RTX%202080%20Ti)-orange.svg)](#-4-computational-performance--hardware-benchmarks)
+[![Audited Benchmark](https://img.shields.io/badge/Benchmark-21%20Properties%20%7C%2049.8k%20ha-blue.svg)](#-4-computational-performance--hardware-benchmarks)
 
 **Image Processing and Geoprocessing Laboratory (LAPIG / Federal University of Goiás - UFG)**  
-*The **ParcelAnything** suite is a modular, high-performance geospatial framework offering two complementary modes for extracting rural land parcels and pasture boundaries with rectilinear fence lines (post-to-post), watertight planar topology (Zero Overlaps, Zero Gaps), zonal validation via MapBiomas (10m / 30m), and continuous hardware telemetry.*
+*The **ParcelAnything** suite is an open-source, high-performance geospatial framework bridging Vision Foundation Models and authoritative rural cadastre. It extracts rural land parcels and pasture boundaries with rectilinear fence lines (post-to-post), watertight planar topology (Zero Overlaps, Zero Gaps), agro-environmental validation via MapBiomas (10m / 30m), and continuous hardware telemetry.*
 
 ---
 
-## 🗺️ Overview: Two Consolidated Operating Modes
+## 🧠 1. Theoretical Foundations: What are SAM, SAMGeo, and ParcelAnything?
+
+To understand how **ParcelAnything** works and why it represents a breakthrough in digital agriculture and remote sensing, we must examine the evolutionary hierarchy linking **General Computer Vision**, **Geospatial Wrappers**, and **Domain-Specific Cadastral Engineering**:
+
+![The Evolutionary Pathway: From Foundation AI to Cadastral Intelligence](images/fig_conceptual_framework.png)
+
+```mermaid
+flowchart TD
+    subgraph Level1["1. Meta AI: Segment Anything Model (SAM)"]
+        direction TB
+        A1["Natural RGB Photos (8-bit)"] --> B1["Heavy ViT-H Encoder (636M Params)"]
+        B1 --> C1["Image Embedding (16× Downscaled)"]
+        D1["Prompts (Points / Boxes)"] --> E1["Fast Mask Decoder (~50ms)"]
+        C1 --> E1
+        E1 --> F1["Raw Binary Mask (Pixel Coordinates)"]
+    end
+
+    subgraph Level2["2. SAMGeo: segment-geospatial (Wu, 2023)"]
+        direction TB
+        A2["Satellite Imagery (GeoTIFF)"] --> B2["Geospatial Tiling & Windowing"]
+        B2 --> C2["SAM ViT-H Inference on GPU"]
+        C2 --> D2["Raw Raster Mask Vectorization"]
+        D2 --> E2["Georeferenced Polygons (.shp / .gpkg)<br/>⚠️ Pixel stairstepping, overlaps, wavy fences"]
+    end
+
+    subgraph Level3["3. LAPIG ParcelAnything (What We Are Doing)"]
+        direction TB
+        A3["Google Earth Engine<br/>Sentinel-2 CS+ Phenology (NDVI Max/Med/Min)"] --> B3["ViT-H Inference<br/>• Auto Mode (Batch Grid)<br/>• Interactive (Bisector Cuts)"]
+        B3 --> C3["Planar Graph Engine<br/>• Shared Edge Simplification<br/>• Post-to-Post Straight Fences<br/>• Watertight Topology (0% Overlap)"]
+        C3 --> D3["Agro-Environmental Auditing<br/>MapBiomas 10m (Col 4) / 30m (Col 11)"]
+        D3 --> E3["Authoritative Cadastral GIS Vectors<br/>Layer 1: Pure Physical Partitions<br/>Layer 2: Certified Productive Pastures"]
+    end
+
+    Level1 -->|"+ Geospatial I/O & CRS Tiling"| Level2
+    Level2 -->|"+ Phenological Composites + Planar Topology + MapBiomas"| Level3
+
+    classDef l1 fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff;
+    classDef l2 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#fff;
+    classDef l3 fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#fff;
+    class Level1 l1;
+    class Level2 l2;
+    class Level3 l3;
+```
+
+---
+
+### 1.1. What is Segment Anything (SAM)? (Meta AI)
+
+Released in 2023 by Meta AI Research ([Kirillov et al., 2023](https://arxiv.org/abs/2304.02643)), the **Segment Anything Model (SAM)** is widely regarded as the first true **Foundation Model for Computer Vision Segmentation**. 
+
+* **The Massive Training Base (SA-1B):** SAM was trained on over **11 million high-resolution images** containing more than **1.1 billion high-quality segmentation masks**, conferring unprecedented zero-shot generalization to unseen objects and textures.
+* **Decoupled Architecture:**
+  1. **Heavy Image Encoder:** A Vision Transformer (ViT-H with ~636 million parameters) processes the input image once to compute a continuous 16× downscaled spatial embedding.
+  2. **Prompt Encoder:** Evaluates real-time geometric guidance such as foreground/background click points, bounding boxes, or coarse masks.
+  3. **Fast Lightweight Mask Decoder:** An efficient Transformer-based MLP decoder fuses image embeddings and prompt tokens in ~50 ms, generating multiple candidate masks with ambiguity resolution.
+* **The Fundamental Limitation for Earth Observation:** SAM was developed for standard 8-bit RGB consumer photography (e.g., everyday scenes, people, animals, vehicles). It has **zero native awareness of geographic coordinates, Coordinate Reference Systems (CRS, EPSG), multispectral bands, temporal phenology, or geographic scale (meters per pixel)**.
+
+---
+
+### 1.2. What is SAMGeo (`segment-geospatial`)?
+
+Developed by [Dr. Qiusheng Wu (2023)](https://github.com/opengeos/segment-geospatial) at the University of Tennessee, **SAMGeo** is an open-source Python ecosystem that builds a direct bridge between Meta's SAM and the GIS geospatial stack (GDAL, Rasterio, GeoPandas, PyProj).
+
+* **Geospatial Translation:** It enables SAM to ingest georeferenced raster files (such as GeoTIFFs), reads spatial metadata (Affine transforms, bounding boxes), and re-projects model predictions back into real-world geographic coordinates.
+* **Tiling & Sliding Windows:** Remote sensing scenes can easily reach tens of thousands of pixels wide. SAMGeo slices massive rasters into manageable overlapping tiles (`tile_size`, `crop_n_layers`) to prevent GPU Out-Of-Memory (OOM) crashes, running SAM sequentially and merging output masks.
+* **Vector Export:** Automatically converts boolean raster masks into basic vector formats (`.shp`, `.geojson`, `.gpkg`).
+
+#### ⚠️ Why Raw SAM and SAMGeo Fall Short for Agricultural Cadastre:
+While SAMGeo successfully adapts SAM to remote sensing rasters, applying it naively to cadastral land boundaries exposes critical operational bottlenecks:
+
+1. **Pixel Stairstepping (10-Meter Raster Artifacts):** Satellite imagery from Sentinel-2 has a 10m spatial resolution. Direct polygonization of raw neural masks creates jagged "staircase" edges with hundreds of redundant vertices along every line.
+2. **Topological Overlaps and Sliver Gaps:** SAM detects features independently. When vectorized, neighboring parcels overlap one another or leave empty voids, violating basic GIS planar topology and artificially inflating calculated surface areas.
+3. **Wavy, Organic Fence Lines:** Physical fence lines dividing rural fields are constructed taut from post to post (*mourão a mourão*). Raw neural network edges oscillate erratically based on pixel-level illumination differences.
+4. **Semantic Blindness:** SAM is class-agnostic: it identifies visual boundaries, but has no concept of agronomy. It cannot distinguish a managed pasture parcel from an annual grain crop, an environmental protection area (APP), a riparian forest corridor, or bare soil.
+
+---
+
+### 1.3. What We Are Doing: LAPIG ParcelAnything
+
+**ParcelAnything** solves the missing link between Computer Vision Foundation Models and authoritative, survey-grade rural cadastre. Developed at the **Image Processing and Geoprocessing Laboratory (LAPIG / UFG)**, our framework implements an end-to-end scientific pipeline:
+
+```
+  Multitemporal Sentinel-2 (CS+)           SAM / HQ-SAM ViT-H            Planar Graph Watertight Engine        MapBiomas Zonal Audit
+┌────────────────────────────────┐    ┌───────────────────────────┐    ┌─────────────────────────────────┐    ┌─────────────────────┐
+│ 3-band Phenological Dynamics:  │ -> │ High-capacity deep        │ -> │ • Intersection noding (node)    │ -> │ Cross-references    │
+│ NDVI Max, Median, Min          │    │ boundary segmentation     │    │ • Douglas-Peucker regularization│    │ 10m Col 4 & 30m     │
+│ Cloud Score+ (cdf >= 0.65)     │    │ Auto Grid / Bisector Cuts │    │ • 0% Overlaps & 0% Gaps         │    │ Dual-layer output   │
+└────────────────────────────────┘    └───────────────────────────┘    └─────────────────────────────────┘    └─────────────────────┘
+```
+
+1. **Multitemporal Phenological Composites (Google Earth Engine + Cloud Score+):**
+   - Instead of a single cloud-prone optical image, we generate annual Sentinel-2 composites combining **NDVI Maximum (R)**, **NDVI Median (G)**, and **NDVI Minimum (B)**, filtered by *Google Cloud Score Plus* (`cs_cdf >= 0.65`).
+   - *Why this matters:* Seasonal vegetative dynamics, stocking rate variations, and paddock rotation cycles cause physical fence lines and management boundaries to stand out spectrally across the temporal stack, which is impossible to detect from a single-date image.
+
+2. **Planar Graph Watertight Topology (Zero Overlaps, Zero Gaps):**
+   - Rather than independently smoothing individual polygons, our vectorizer (`cadastral_vectorizer.py`) decomposes all boundaries into a unified **Planar Graph**:
+   - Nodes all boundary intersections (`shapely.node`), merges co-linear segments (`linemerge`), and applies chordal distance regularization to produce **straight post-to-post fence lines**.
+   - Reconstructs polygons via planar polygonization (`polygonize`), mathematically guaranteeing **0% overlap and 0% sliver gaps (Watertight Topology)**.
+   - Strictly clips geometries to the legal boundary registered in the *Cadastro Ambiental Rural* (CAR).
+
+3. **Agro-Environmental Auditing via MapBiomas (10m Col 4 & 30m Col 11):**
+   - Every physical parcel is audited against the MapBiomas land cover classification.
+   - Generates two distinct, certified GIS layers:
+     * **Layer 1: Pure Physical Cadastral Layout (`parcels_pure_segmentation`):** All physical land partitions identified inside the estate.
+     * **Layer 2: Certified Productive Pasture Boundaries (`parcels_final_straight_fences`):** Parcels validated with $\ge 35\%$ pasture dominance, segregating native vegetation, riparian buffers, and agriculture.
+
+4. **Continuous Hardware Telemetry & Zero-Leak GPU Management:**
+   - Deep learning batch pipelines frequently crash due to fragmented CUDA VRAM. ParcelAnything implements an audited memory lifecycle (`torch.cuda.empty_cache()`, garbage collection, IPC collection), maintaining an average VRAM footprint of **6.47 GB** on consumer GPUs across 50,000 hectares.
+
+5. **Two Complementary Operating Modes:**
+   - **Auto Mode (`lapig_parcel_segmentation`):** Headless, autonomous batch processing designed to segment entire municipalities or massive regional databases.
+   - **Interactive Mode (`interactive_hq_sam`):** A human-in-the-loop web workstation where GIS operators place positive (`+`) and negative (`−`) seeds. Negative seeds trigger an analytical **perpendicular bisector cut** (Eq. 1 of our SBSR paper) to sever disputed boundaries in real time.
+
+---
+
+### 1.4. Technical Comparison Matrix
+
+| Feature / Dimension | 1. Meta AI SAM | 2. SAMGeo (`segment-geospatial`) | 3. LAPIG ParcelAnything (This Work) |
+| :--- | :--- | :--- | :--- |
+| **Primary Domain** | General Computer Vision | General Earth Observation (GIS) | **Agricultural Cadastre & Rural Land Parcels** |
+| **Input Imagery** | 8-bit standard RGB photos | Georeferenced GeoTIFF (Single-date) | **Multitemporal Sentinel-2 Phenology (NDVI Max/Med/Min with CS+)** |
+| **Spatial Awareness** | Pixel coordinates only (0..W, 0..H) | Projected CRS & Geographic bounds | **Full CRS reprojection + CAR Property Clipping** |
+| **Vector Topology** | None (Output is binary raster mask) | Uncontrolled overlaps & sliver gaps | **Watertight Planar Graph (0% Overlap, 0% Gaps guaranteed)** |
+| **Fence Geometry** | N/A (Raster pixels) | Jagged 10m stairstepping & wavy curves | **Rectilinear post-to-post straight fences** |
+| **Land Cover Validation** | None (Class-agnostic) | None (Purely structural) | **MapBiomas 10m (Col 4) / 30m (Col 11) Zonal Auditing** |
+| **Deliverables** | In-memory masks | Raw Shapefile / GeoJSON | **Dual-layer GIS: Pure Partitions + Certified Pastures** |
+| **Interactive Prompts** | Point, Box, Mask | Point, Box (via Leafmap/Folium) | **Positive/Negative Seeds with Perpendicular Bisector Cuts** |
+| **GPU Memory Lifecycle** | Manual | Standard PyTorch | **Audited Zero-Leak VRAM Governance (50k ha verified)** |
+
+---
+
+## 🗺️ 2. Overview: Two Consolidated Operating Modes
 
 The project organizes cadastral parcel segmentation and vectorization into **two independent and complementary modes**:
 
@@ -53,9 +185,9 @@ Vectorization_Pro/
 
 ---
 
-## 📸 1. Results Gallery: From Satellite Imagery to Cadastral Vectors
+## 📸 3. Results Gallery: From Satellite Imagery to Cadastral Vectors
 
-**ParcelAnything** converts multitemporal Sentinel-2 imagery into GIS-ready, topologically sound cadastral polygons. Unlike naive vectorization techniques (such as standard raster polygonization or independent boundary smoothing), our method employs **Planar Graphs** that simplify shared boundaries, eliminate raster stairstepping (10m pixel artifacts), and enforce **Zero Overlaps and Zero Gaps (Watertight Topology)**.
+**ParcelAnything** converts multitemporal Sentinel-2 imagery into GIS-ready, topologically sound cadastral polygons. Unlike naive vectorization techniques, our method employs **Planar Graphs** that simplify shared boundaries, eliminate raster stairstepping (10m pixel artifacts), and enforce **Zero Overlaps and Zero Gaps (Watertight Topology)**.
 
 ### Case 1: Rural Estate in Caiapônia (GO, Brazil) — 749.52 ha
 > **Highlights:** Extraction of 42 rectified parcels. Riparian forest buffers and central water bodies are strictly preserved, eliminating internal enclaves and Deep Learning noise artifacts.
@@ -75,7 +207,7 @@ Vectorization_Pro/
 
 ---
 
-## ⚡ 2. Computational Performance & Hardware Benchmarks
+## ⚡ 4. Computational Performance & Hardware Benchmarks
 
 **ParcelAnything** was subjected to an audited continuous batch stress test covering **21 rural properties** (20 in Goiás and 1 in Mato Grosso do Sul, Brazil) across major agricultural frontiers, totaling **49,760.02 hectares** of analyzed cadastral area.
 
@@ -103,7 +235,7 @@ Vectorization_Pro/
 | **Goiás (GO)** | `GO-5208905-F49642881887...` | 10,828.80 ha | 345 | 354 | 8.2 min | 9.54 GB |
 | **Nova Crixás (GO)** | `GO-5214838-32EB159D2A3C...` | 9,719.91 ha | 224 | 267 | 1.0 min | 0.01 GB |
 | **Jataí (GO)** | `GO-5211909-AD13173067F8...` | 9,107.04 ha | 234 | 248 | 9.5 min | 8.53 GB |
-| **Bom Jesus de Goiás (GO)** | `GO-5203500-366A293867A2...` | 4,476.31 ha | 138 | 178 | 9.5 min | 6.47 GB |
+| **Bom Jesus de Goiás (GO)** | `GO-5203500-366A293867A2...` | 138 | 178 | 9.5 min | 6.47 GB |
 | **Britânia (GO)** | `GO-5203807-146172AFEDAF...` | 2,629.80 ha | 75 | 79 | 8.0 min | 6.47 GB |
 | **Serranópolis (GO)** | `GO-5220504-AE59920E9ABB...` | 2,114.08 ha | 96 | 99 | 8.7 min | 6.47 GB |
 | **Santa Fé de Goiás (GO)** | `GO-5219258-B3304BD38B7B...` | 1,889.02 ha | 119 | 121 | 4.6 min | 6.47 GB |
@@ -127,7 +259,7 @@ Vectorization_Pro/
 
 ---
 
-## 🏗️ 3. Pipeline Architecture
+## 🏗️ 5. Pipeline Architecture
 
 ```
                  Universal Area of Interest Input (Universal ROI)
@@ -140,54 +272,54 @@ Vectorization_Pro/
                    └────────────────────────┼────────────────────────┘
                                             │
                                             ▼
-                       [Dedicated Property Folder]
-                          results/{PROPERTY_ID}/
+                        [Dedicated Property Folder]
+                           results/{PROPERTY_ID}/
                                             │
                                             ▼
-                                  Google Earth Engine
-                          ┌─────────────────────────────────┐
-                          │  Sentinel-2 Harmonized (CS+)    │
-                          │  Bands: NDVI max, median, min   │
-                          └─────────────────┬───────────────┘
-                                            │
-                                            ▼
-                                 [Module: s2_mosaic]
-                                            │ (Multitemporal GeoTIFF composite)
-                                            ▼
-                             [Module: sam_segmenter]
-                         (SAMGeo ViT-H on CUDA GPU 8GB/11GB+)
-                                            │ (Raw binary raster masks)
-                                            ▼
-                          [Module: cadastral_vectorizer]
-                          ├── Internal enclave and hole elimination
-                          ├── Planar Graph and Fence Line Rectification
-                          └── Watertight Reconstruction (Zero Overlaps)
-                                            │
-                                            ▼
-                     [Strict Boundary Clipping to Rural Property CAR]
-                                            │
-         ┌──────────────────────────────────┴──────────────────────────────────┐
-         ▼                                                                     ▼
- [LAYER 1: PURE PHYSICAL SEGMENTATION]                                 [LAYER 2: PASTURE DOMINANCE]
- All physical parcels within the estate                                Productive pasture parcels
- with comprehensive audit attributes:                                  validated by zonal coverage:
- (pasture_cov, ndvi_med, is_pasture, class)                           (MapBiomas 10m Col 4 / 30m Col 11)
-         │                                                                     │
-         ▼                                                                     ▼
- Shapefile: parcels_pure_segmentation_{ID}.shp      Shapefile: parcels_final_straight_fences_{ID}.shp
+                                   Google Earth Engine
+                           ┌─────────────────────────────────┐
+                           │  Sentinel-2 Harmonized (CS+)    │
+                           │  Bands: NDVI max, median, min   │
+                           └─────────────────┬───────────────┘
+                                             │
+                                             ▼
+                                  [Module: s2_mosaic]
+                                             │ (Multitemporal GeoTIFF composite)
+                                             ▼
+                              [Module: sam_segmenter]
+                          (SAMGeo ViT-H on CUDA GPU 8GB/11GB+)
+                                             │ (Raw binary raster masks)
+                                             ▼
+                           [Module: cadastral_vectorizer]
+                           ├── Internal enclave and hole elimination
+                           ├── Planar Graph and Fence Line Rectification
+                           └── Watertight Reconstruction (Zero Overlaps)
+                                             │
+                                             ▼
+                      [Strict Boundary Clipping to Rural Property CAR]
+                                             │
+          ┌──────────────────────────────────┴──────────────────────────────────┐
+          ▼                                                                     ▼
+  [LAYER 1: PURE PHYSICAL SEGMENTATION]                                 [LAYER 2: PASTURE DOMINANCE]
+  All physical parcels within the estate                                Productive pasture parcels
+  with comprehensive audit attributes:                                  validated by zonal coverage:
+  (pasture_cov, ndvi_med, is_pasture, class)                           (MapBiomas 10m Col 4 / 30m Col 11)
+          │                                                                     │
+          ▼                                                                     ▼
+  Shapefile: parcels_pure_segmentation_{ID}.shp      Shapefile: parcels_final_straight_fences_{ID}.shp
 ```
 
 ---
 
-## 🚀 4. Installation & Environment Setup
+## 🚀 6. Installation & Environment Setup
 
-### 4.1. System Requirements
+### 6.1. System Requirements
 - **Operating System:** Linux (Ubuntu 22.04+) or Windows 11 with WSL 2
 - **Python:** Version 3.10 or higher
 - **NVIDIA GPU:** Minimum 8 GB VRAM (11 GB+ recommended, e.g., RTX 2080 Ti, RTX 3060 12GB, RTX 4070+)
 - **Google Earth Engine:** Active account authenticated via Earth Engine CLI
 
-### 4.2. Step-by-Step Installation
+### 6.2. Step-by-Step Installation
 
 ```bash
 # 1. Clone the repository
@@ -208,7 +340,7 @@ pip install segment-geospatial earthengine-api geopandas shapely rasterio matplo
 earthengine authenticate
 ```
 
-### 4.3. Downloading SAM (ViT-H) Model Weights
+### 6.3. Downloading SAM (ViT-H) Model Weights
 The SAM ViT-H model weights checkpoint (`sam_vit_h_4b8939.pth` - ~2.5 GB) must be placed in the `models/` directory:
 ```bash
 mkdir -p models
@@ -218,11 +350,11 @@ curl -o models/sam_vit_h_4b8939.pth https://dl.fbaipublicfiles.com/segment_anyth
 
 ---
 
-## ⚙️ 5. Auto Mode CLI & Python Usage (`lapig_parcel_segmentation`)
+## ⚙️ 7. Auto Mode CLI & Python Usage (`lapig_parcel_segmentation`)
 
 The automated batch pipeline is executed via the Command-Line Interface (CLI) through [`example_run.py`](lapig_parcel_segmentation/example_run.py) or imported directly as a Python module.
 
-### 5.1. CLI Parameter Reference
+### 7.1. CLI Parameter Reference
 
 | Argument | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
@@ -243,7 +375,7 @@ The automated batch pipeline is executed via the Command-Line Interface (CLI) th
 
 ---
 
-### 5.2. Practical Execution Scenarios
+### 7.2. Practical Execution Scenarios
 
 #### Scenario A: Process a specific farm from a local CAR GeoPackage
 ```bash
@@ -256,7 +388,6 @@ python -m lapig_parcel_segmentation.example_run \
 ```
 
 #### Scenario B: Process a property using only its GPS coordinates
-The pipeline queries the Earth Engine CAR repository, locates the exact farm boundaries, downloads the Sentinel-2 composite, and runs full cadastral vectorization:
 ```bash
 python -m lapig_parcel_segmentation.example_run \
     --coord "-16.1234, -50.5678" \
@@ -285,7 +416,6 @@ python -m lapig_parcel_segmentation.example_run \
 - `results/relatorio_benchmark_hardware_lote.json` and `.txt` (Consolidated hardware profiling report).
 
 #### Scenario E: Pure Physical Segmentation Mode (Without Pasture Masking)
-Ideal for researchers and GIS analysts wanting to map all physical field partitions regardless of current land use:
 ```bash
 python -m lapig_parcel_segmentation.example_run \
     --input "car_goias_area_imovel_epsg4674_hottest.gpkg" \
@@ -296,7 +426,7 @@ python -m lapig_parcel_segmentation.example_run \
 
 ---
 
-### 5.3. Programmatic Usage in Python
+### 7.3. Programmatic Usage in Python
 
 ```python
 from lapig_parcel_segmentation import run_analysis_lapig
@@ -319,11 +449,11 @@ print(f"Generated shapefile: {shp_pasture}")
 
 ---
 
-## 🖱️ 6. Interactive Human-in-the-Loop Mode (`interactive_hq_sam`)
+## 🖱️ 8. Interactive Human-in-the-Loop Mode (`interactive_hq_sam`)
 
 The interactive mode is engineered for **visual-intelligence assisted operations**. It allows GIS operators to audit pasture boundaries, resolve contested fence lines, and segment intricate parcel layouts with instantaneous AI feedback.
 
-### 6.1. Starting the Local Web Server
+### 8.1. Starting the Local Web Server
 
 From the project root:
 ```bash
@@ -334,7 +464,7 @@ Open in your browser:
 
 ---
 
-### 6.2. Step-by-Step Operator Workflow
+### 8.2. Step-by-Step Operator Workflow
 
 ```
   1. Load ROI              2. Prompt Sampling      3. Validation         4. Watertight Topology
@@ -369,7 +499,7 @@ Open in your browser:
 
 ---
 
-## 📂 7. Directory Structure & Attribute Dictionary
+## 📂 9. Directory Structure & Attribute Dictionary
 
 ### Generated File Hierarchy per Property in `results/{ID}/`:
 ```
@@ -397,7 +527,7 @@ results/GO-5204409-01D1AD1F9586415E9D46BF93115D27DF/
 
 ---
 
-## 👥 Credits & Team
+## 👥 10. Credits & Team
 
 * **Image Processing and Geoprocessing Laboratory (LAPIG)** — Federal University of Goiás (UFG, Brazil)
 * **Lead Development & Architecture:** Vinícius Mesquita & LAPIG Team
